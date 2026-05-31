@@ -1,0 +1,11 @@
+.next/
+node_modules/
+.env.local
+.env.production
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+*.log
+
+.idea/
+.superpowers/
+.DS_Store
