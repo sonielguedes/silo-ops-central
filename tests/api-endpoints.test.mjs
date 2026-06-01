@@ -108,10 +108,14 @@ test("health, equipment and operations routes short-circuit in demo mode", () =>
   const eventsSource = readFileSync(new URL("../src/app/api/eventos/route.ts", import.meta.url), "utf8");
 
   assert.match(healthSource, /IS_DEMO/);
+  assert.match(healthSource, /SITE_URL/);
   assert.match(healthSource, /ambiente:\s*"demo"/);
   assert.match(equipmentSource, /IS_DEMO/);
+  assert.match(equipmentSource, /SITE_URL/);
   assert.match(opsSource, /IS_DEMO/);
+  assert.match(opsSource, /SITE_URL/);
   assert.match(eventsSource, /IS_DEMO/);
+  assert.match(eventsSource, /SITE_URL/);
 });
 
 test("operators api route keeps demo and local writes controlled", () => {

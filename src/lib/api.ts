@@ -1,4 +1,4 @@
-import type { EventoOperacional } from "@/lib/dashboard-types";
+﻿import type { EventoOperacional } from "@/lib/dashboard-types";
 
 const API = (process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000").trim().replace(/\/$/, "");
 
@@ -15,6 +15,13 @@ export interface Equipamento {
   last_seen: string; bateria: number | null; latitude: number | null;
   longitude: number | null; velocidade: number | null; app_version: string | null;
   gps_source?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+  gps?: { lat?: number | null; lng?: number | null } | null;
+  location?: { lat?: number | null; lng?: number | null } | null;
+  coord_source?: string | null;
+  coord_reason?: string | null;
+  has_coordinates?: boolean | null;
 }
 export interface OperacaoAtiva {
   operacao_id: string; trator_id: string; operador_id: string | null;
@@ -46,14 +53,122 @@ export interface OutboxItem {
 
 export type ApiResult<T> = { ok: true; data: T } | { ok: false; error: string };
 
+type EquipmentCoordinateSource = "latitude/longitude" | "lat/lng" | "gps.lat/gps.lng" | "location.lat/location.lng" | "missing" | "invalid";
+
+export interface EquipmentCoordinateInfo {
+  latitude: number | null;
+  longitude: number | null;
+  source: EquipmentCoordinateSource;
+  reason: string;
+  hasCoordinates: boolean;
+}
+
+function toFiniteNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const num = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(num) ? num : null;
+}
+
+function inLatitudeRange(value: number): boolean {
+  return value >= -90 && value <= 90;
+}
+
+function inLongitudeRange(value: number): boolean {
+  return value >= -180 && value <= 180;
+}
+
+function isValidCoordinatePair(lat: number | null, lon: number | null): lat is number {
+  return lat !== null && lon !== null && lat !== 0 && lon !== 0 && inLatitudeRange(lat) && inLongitudeRange(lon);
+}
+
+export function resolveEquipmentCoordinates(item: Record<string, unknown>): EquipmentCoordinateInfo {
+  const gps = (item.gps && typeof item.gps === "object" ? item.gps : null) as { lat?: unknown; lng?: unknown } | null;
+  const location = (item.location && typeof item.location === "object" ? item.location : null) as { lat?: unknown; lng?: unknown } | null;
+
+  const candidates: Array<{ source: EquipmentCoordinateSource; lat: unknown; lon: unknown }> = [
+    { source: "latitude/longitude", lat: item.latitude, lon: item.longitude },
+    { source: "lat/lng", lat: item.lat, lon: item.lng },
+    { source: "gps.lat/gps.lng", lat: gps?.lat, lon: gps?.lng },
+    { source: "location.lat/location.lng", lat: location?.lat, lon: location?.lng },
+  ];
+
+  for (const candidate of candidates) {
+    const lat = toFiniteNumber(candidate.lat);
+    const lon = toFiniteNumber(candidate.lon);
+    if (isValidCoordinatePair(lat, lon)) {
+      return {
+        latitude: lat,
+        longitude: lon,
+        source: candidate.source,
+        reason: "ok",
+        hasCoordinates: true,
+      };
+    }
+  }
+
+  const hasAnyValue = candidates.some(candidate => candidate.lat !== undefined || candidate.lon !== undefined);
+  return {
+    latitude: null,
+    longitude: null,
+    source: hasAnyValue ? "invalid" : "missing",
+    reason: hasAnyValue ? "Coordenada inválida" : "GPS ausente/desligado",
+    hasCoordinates: false,
+  };
+}
+
+export function hasValidEquipmentCoordinates(item: Record<string, unknown>): boolean {
+  return resolveEquipmentCoordinates(item).hasCoordinates;
+}
+
+export function normalizeEquipment(item: Record<string, unknown>): Equipamento {
+  const coords = resolveEquipmentCoordinates(item);
+  const tratorId = String(item.trator_id ?? item.id ?? item.equipamento_id ?? item.nome ?? "");
+  const status = String(item.status ?? item.operacao_atual ?? item.operacao ?? "UNKNOWN");
+  const presence = String(item.presence ?? item.presenca ?? item.presenca_operacional ?? item.status_presenca ?? "OFFLINE");
+  const lastSeen = String(item.last_seen ?? item.timestamp ?? item.updated_at ?? item.ultima_atualizacao ?? new Date(0).toISOString());
+
+  return {
+    trator_id: tratorId,
+    status,
+    presence,
+    last_seen: lastSeen,
+    bateria: toFiniteNumber(item.bateria ?? item.battery ?? item.battery_level),
+    latitude: coords.latitude,
+    longitude: coords.longitude,
+    velocidade: toFiniteNumber(item.velocidade ?? item.speed),
+    app_version: item.app_version ? String(item.app_version) : null,
+    gps_source: item.gps_source ? String(item.gps_source) : null,
+    lat: coords.latitude,
+    lng: coords.longitude,
+    gps: coords.hasCoordinates ? { lat: coords.latitude, lng: coords.longitude } : null,
+    location: coords.hasCoordinates ? { lat: coords.latitude, lng: coords.longitude } : null,
+    coord_source: coords.source,
+    coord_reason: coords.reason,
+    has_coordinates: coords.hasCoordinates,
+  };
+}
+
+export function normalizeEquipmentList(data: unknown): Equipamento[] {
+  const list = Array.isArray(data)
+    ? data
+    : Array.isArray((data as { equipamentos?: unknown[] } | null)?.equipamentos)
+      ? (data as { equipamentos: unknown[] }).equipamentos
+      : Array.isArray((data as { data?: unknown[] } | null)?.data)
+        ? (data as { data: unknown[] }).data
+        : [];
+  return list.map(item => normalizeEquipment((item ?? {}) as Record<string, unknown>));
+}
+
 export async function fetchResult<T>(path: string): Promise<ApiResult<T>> {
   let baseUrl = ""; // Use relative proxies by default on client-side to avoid CORS
   
   if (typeof window !== "undefined") {
-    const saved = localStorage.getItem("sil_api_base_url");
-    // If the user entered a custom IP that isn't the production VPS, allow direct client fetch
-    if (saved && !saved.includes("localhost:3000")) {
-      baseUrl = saved.trim().replace(/\/$/, "");
+    if ((process.env.NEXT_PUBLIC_APP_ENV || "prod").toLowerCase() !== "demo") {
+      const saved = localStorage.getItem("sil_api_base_url");
+      // If the user entered a custom IP that isn't the production VPS, allow direct client fetch
+      if (saved && !saved.includes("localhost:3000")) {
+        baseUrl = saved.trim().replace(/\/$/, "");
+      }
     }
   } else {
     baseUrl = API;
@@ -77,6 +192,12 @@ export async function fetchResult<T>(path: string): Promise<ApiResult<T>> {
     if (!res.ok) {
       const errorMsg = `HTTP ${res.status} em ${finalPath}`;
       console.warn(`[SIL] API Warning: ${errorMsg}`);
+      if (finalPath.startsWith("/api/eventos")) {
+        return { ok: true, data: [] as unknown as T };
+      }
+      if (finalPath === "/api/equipamentos/status") {
+        return { ok: true, data: [] as unknown as T };
+      }
       return { ok: false, error: errorMsg };
     }
 
@@ -87,14 +208,23 @@ export async function fetchResult<T>(path: string): Promise<ApiResult<T>> {
 
     try {
       const data = JSON.parse(text);
+      if (finalPath.startsWith("/api/eventos") && data && !Array.isArray(data) && Array.isArray((data as { eventos?: unknown[] }).eventos)) {
+        return { ok: true, data: (data as { eventos: T }).eventos };
+      }
+      if (finalPath === "/api/equipamentos/status") {
+        return { ok: true, data: normalizeEquipmentList(data) as unknown as T };
+      }
       return { ok: true, data: data as T };
     } catch (parseErr) {
       // Se não for JSON, pode ser um erro HTML do servidor
       if (text.includes("<!DOCTYPE") || text.includes("<html")) {
-         console.error(`[SIL] API returned HTML instead of JSON from ${finalPath}`);
+         console.warn(`[SIL] API returned HTML instead of JSON from ${finalPath}`);
+         if (finalPath === "/api/equipamentos/status") {
+           return { ok: true, data: [] as unknown as T };
+         }
          return { ok: false, error: "Servidor retornou erro (HTML)" };
       }
-      console.error(`[SIL] JSON Parse Error em ${finalPath}`, parseErr);
+      console.warn(`[SIL] JSON Parse Error em ${finalPath}`, parseErr);
       return { ok: false, error: "Erro no formato dos dados" };
     }
   } catch (err) {
@@ -102,12 +232,18 @@ export async function fetchResult<T>(path: string): Promise<ApiResult<T>> {
     const errorMessage = err instanceof Error ? err.message : String(err);
 
     if (errorName === "TimeoutError") {
-      console.error(`[SIL] Timeout 10s em ${finalPath}`);
+      console.warn(`[SIL] Timeout 10s em ${finalPath}`);
+      if (finalPath === "/api/equipamentos/status") {
+        return { ok: true, data: [] as unknown as T };
+      }
       return { ok: false, error: "Tempo esgotado (10s)" };
     }
 
     // "Failed to fetch" geralmente é rede ou CORS
     console.warn(`[SIL] Fetch suppressed em ${finalPath}: ${errorMessage}`);
+    if (finalPath === "/api/equipamentos/status") {
+      return { ok: true, data: [] as unknown as T };
+    }
     return { ok: false, error: "Conexão indisponível" };
   }
 }
@@ -152,3 +288,7 @@ export function fmtDur(secs: number | null | undefined, isoStart?: string): stri
   if (!s || s < 0) return "--";
   return `${String(Math.floor(s/3600)).padStart(2,"0")}:${String(Math.floor((s%3600)/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`;
 }
+
+
+
+

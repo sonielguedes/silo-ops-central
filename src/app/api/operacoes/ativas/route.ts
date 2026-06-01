@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { IS_DEMO } from "@/lib/app-env";
+import { IS_DEMO, SITE_URL } from "@/lib/app-env";
 
 const B = (process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000").trim().replace(/\/$/, "");
 
 export async function GET() {
-  if (IS_DEMO) {
+  if (IS_DEMO || (SITE_URL && B === SITE_URL)) {
     return NextResponse.json([], { status: 200 });
   }
 

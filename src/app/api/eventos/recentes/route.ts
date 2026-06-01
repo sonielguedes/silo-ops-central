@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { IS_DEMO } from "@/lib/app-env";
+import { IS_DEMO, SITE_URL } from "@/lib/app-env";
 
 const BASE = (process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "").trim().replace(/\/$/, "");
 const TECH_EMPTY = "Nenhum evento real recebido ainda";
@@ -32,7 +32,7 @@ async function fetchUpstream(url: string) {
 }
 
 export async function GET(req: NextRequest) {
-  if (IS_DEMO) {
+  if (IS_DEMO || (SITE_URL && BASE === SITE_URL)) {
     return NextResponse.json({ eventos: [], status_tecnico: TECH_EMPTY, upstream_status: null, reason: "demo-mode" }, { status: 200 });
   }
 
