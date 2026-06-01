@@ -33,6 +33,8 @@ test("local proxy route exists for /api/equipamentos/status", () => {
 test("health proxy reports degraded/down instead of throwing raw upstream failures", () => {
   const healthSource = readFileSync(new URL("../src/app/api/health/route.ts", import.meta.url), "utf8");
 
+  assert.match(healthSource, /IS_DEMO/);
+  assert.match(healthSource, /ambiente:\s*"demo"/);
   assert.match(healthSource, /status:\s*r\.ok\s*\?\s*"ok"\s*:\s*"degraded"/);
   assert.match(healthSource, /status:\s*"down"/);
   assert.match(healthSource, /upstream_status:\s*r\.status/);
@@ -84,6 +86,7 @@ test("operators page blocks demo writes and supports localStorage CRUD", () => {
 test("api/eventos route returns controlled technical empty payload", () => {
   const routeSource = readFileSync(new URL("../src/app/api/eventos/route.ts", import.meta.url), "utf8");
 
+  assert.match(routeSource, /IS_DEMO/);
   assert.match(routeSource, /status_tecnico/);
   assert.match(routeSource, /Nenhum evento real recebido ainda/);
   assert.equal(existsSync(new URL("../src/app/api/eventos/route.ts", import.meta.url)), true);
@@ -92,9 +95,23 @@ test("api/eventos route returns controlled technical empty payload", () => {
 test("recent events route exists and returns empty array when backend is unavailable", () => {
   const routeSource = readFileSync(new URL("../src/app/api/eventos/recentes/route.ts", import.meta.url), "utf8");
 
+  assert.match(routeSource, /IS_DEMO/);
   assert.match(routeSource, /status_tecnico/);
   assert.match(routeSource, /eventos:\s*\[\]/);
   assert.equal(existsSync(new URL("../src/app/api/eventos/recentes/route.ts", import.meta.url)), true);
+});
+
+test("health, equipment and operations routes short-circuit in demo mode", () => {
+  const healthSource = readFileSync(new URL("../src/app/api/health/route.ts", import.meta.url), "utf8");
+  const equipmentSource = readFileSync(new URL("../src/app/api/equipamentos/status/route.ts", import.meta.url), "utf8");
+  const opsSource = readFileSync(new URL("../src/app/api/operacoes/ativas/route.ts", import.meta.url), "utf8");
+  const eventsSource = readFileSync(new URL("../src/app/api/eventos/route.ts", import.meta.url), "utf8");
+
+  assert.match(healthSource, /IS_DEMO/);
+  assert.match(healthSource, /ambiente:\s*"demo"/);
+  assert.match(equipmentSource, /IS_DEMO/);
+  assert.match(opsSource, /IS_DEMO/);
+  assert.match(eventsSource, /IS_DEMO/);
 });
 
 test("operators api route keeps demo and local writes controlled", () => {

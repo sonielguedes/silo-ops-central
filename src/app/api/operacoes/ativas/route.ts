@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
+import { IS_DEMO } from "@/lib/app-env";
 
 const B = (process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000").trim().replace(/\/$/, "");
 
 export async function GET() {
+  if (IS_DEMO) {
+    return NextResponse.json([], { status: 200 });
+  }
+
   try {
     const r = await fetch(`${B}/api/operacoes/ativas`, {
       cache: "no-store",
@@ -33,4 +38,3 @@ export async function GET() {
     return NextResponse.json({ error: String(e) }, { status: 502 });
   }
 }
-
