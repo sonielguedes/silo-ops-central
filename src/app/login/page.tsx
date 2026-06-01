@@ -1,21 +1,48 @@
 "use client";
-import { useState } from "react";
+
+import { useEffect, useState } from "react";
 import Image from "next/image";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { IS_DEMO } from "@/lib/app-env";
+import { sanitizeReturnTo } from "@/lib/auth";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const { login } = useAuth();
+  const [redirecting, setRedirecting] = useState(false);
+  const { login, isAuthenticated } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const returnTo = sanitizeReturnTo(searchParams.get("returnTo"));
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    setRedirecting(true);
+    router.replace(returnTo);
+  }, [isAuthenticated, returnTo, router]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!login(email, password)) {
-      setError("Credenciais inválidas. Verifique seu e-mail e senha.");
+    setError("");
+
+    const result = await login(email, password, returnTo);
+    if (!result.ok) {
+      setError(result.message || "Credenciais inválidas. Verifique seu e-mail e senha.");
+      return;
     }
+
+    router.replace(result.returnTo || returnTo);
   };
+
+  if (redirecting || isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-[#080d12] flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-[#00d4ff]/20 border-t-[#00d4ff] rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#080d12] flex items-center justify-center p-4 relative overflow-hidden">

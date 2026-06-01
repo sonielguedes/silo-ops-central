@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import "./globals.css";
 import SidebarWrapper from "@/components/SidebarWrapper";
 import { AuthProvider } from "@/lib/auth-context";
+import { decodeSessionCookie, SESSION_COOKIE_NAME } from "@/lib/auth";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
@@ -32,15 +34,18 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const sessionCookie = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
+  const initialSession = decodeSessionCookie(sessionCookie);
+
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <body className="min-h-screen bg-[#080d12] text-[#c8d8e8] antialiased">
-        <AuthProvider>
+        <AuthProvider initialSession={initialSession}>
           <SidebarWrapper>{children}</SidebarWrapper>
         </AuthProvider>
       </body>

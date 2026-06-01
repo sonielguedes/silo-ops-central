@@ -56,7 +56,7 @@ test("map uses configurable equipment icons and menu exposes icon configuration"
 });
 
 test("map page only renders markers for valid coordinates and lists the reason for missing GPS", () => {
-  const mapaSource = readFileSync(new URL("../src/app/mapa/page.tsx", import.meta.url), "utf8");
+  const mapaSource = readFileSync(new URL("../src/app/mapa/MapaClient.tsx", import.meta.url), "utf8");
 
   assert.match(mapaSource, /resolveEquipmentCoordinates/);
   assert.match(mapaSource, /coord\.hasCoordinates/);
@@ -206,15 +206,36 @@ test("demo safety files exist and hide local env", () => {
 test("demo login credentials are centralized and gated by demo environment", () => {
   const loginContext = readFileSync(new URL("../src/lib/auth-context.tsx", import.meta.url), "utf8");
   const loginPage = readFileSync(new URL("../src/app/login/page.tsx", import.meta.url), "utf8");
+  const loginRoute = readFileSync(new URL("../src/app/api/auth/login/route.ts", import.meta.url), "utf8");
+  const logoutRoute = readFileSync(new URL("../src/app/api/auth/logout/route.ts", import.meta.url), "utf8");
 
   assert.match(authSource, /demo@siloops\.com\.br/);
   assert.match(authSource, /SiloOps@2026/);
   assert.match(authSource, /IS_DEMO/);
   assert.match(authSource, /canUseDemoLogin/);
   assert.match(authSource, /canUseProdLogin/);
-  assert.match(loginContext, /buildSession/);
-  assert.match(loginContext, /router\.replace\("\/"\)/);
+  assert.match(authSource, /SESSION_COOKIE_NAME/);
+  assert.match(authSource, /OFFICIAL_PROD_AUTH/);
+  assert.match(loginContext, /fetch\("\/api\/auth\/login"/);
+  assert.match(loginContext, /fetch\("\/api\/auth\/logout"/);
+  assert.match(loginContext, /mirrorSession/);
+  assert.match(loginContext, /sil_session_visual/);
+  assert.match(loginPage, /returnTo/);
   assert.match(loginPage, /Ambiente demonstrativo ativo/);
+  assert.match(loginRoute, /httpOnly/);
+  assert.match(loginRoute, /returnTo/);
+  assert.match(loginRoute, /profile:/);
+  assert.match(logoutRoute, /SESSION_COOKIE_NAME/);
+});
+
+test("middleware guards internal pages and preserves returnTo while leaving api routes public", () => {
+  const middlewareSource = readFileSync(new URL("../src/middleware.ts", import.meta.url), "utf8");
+
+  assert.match(middlewareSource, /\/login/);
+  assert.match(middlewareSource, /\/api\//);
+  assert.match(middlewareSource, /returnTo/);
+  assert.match(middlewareSource, /decodeSessionCookie/);
+  assert.match(middlewareSource, /SESSION_COOKIE_NAME/);
 });
 
 test("dashboard premium exposes technical status, events and operations blocks", () => {

@@ -1,80 +1,112 @@
 "use client";
+
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
-import { DEMO_AUTH, buildSession, canUseDemoLogin, canUseProdLogin } from "@/lib/auth";
+import { useRouter } from "next/navigation";
+import {
+  buildSession,
+  buildVisualProfile,
+  decodeSessionCookie,
+  encodeSessionCookie,
+  sanitizeReturnTo,
+  SESSION_COOKIE_NAME,
+  SessionPayload,
+} from "@/lib/auth";
+
+const SESSION_VISUAL_KEY = "sil_session_visual";
+
+interface LoginResult {
+  ok: boolean;
+  message?: string;
+  returnTo?: string;
+}
 
 interface AuthContextType {
+  session: SessionPayload | null;
   isAuthenticated: boolean;
-  login: (email: string, pass: string) => boolean;
-  logout: () => void;
+  login: (email: string, pass: string, returnTo?: string) => Promise<LoginResult>;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [loading, setLoading] = useState(true);
+function mirrorSession(session: SessionPayload | null) {
+  if (typeof window === "undefined") return;
+  if (session) {
+    localStorage.setItem(SESSION_VISUAL_KEY, JSON.stringify(buildVisualProfile(session.email, session.mode)));
+  } else {
+    localStorage.removeItem(SESSION_VISUAL_KEY);
+  }
+}
+
+export function AuthProvider({
+  children,
+  initialSession = null,
+}: {
+  children: React.ReactNode;
+  initialSession?: SessionPayload | null;
+}) {
+  const [session, setSession] = useState<SessionPayload | null>(initialSession);
   const router = useRouter();
-  const pathname = usePathname();
 
   useEffect(() => {
+    mirrorSession(session);
+  }, [session]);
+
+  useEffect(() => {
+    if (!session) return;
+    const remaining = session.expiry - Date.now();
+    if (remaining <= 0) {
+      setSession(null);
+      return;
+    }
+    const timer = window.setTimeout(() => setSession(null), remaining);
+    return () => window.clearTimeout(timer);
+  }, [session]);
+
+  const login = async (email: string, pass: string, returnTo?: string): Promise<LoginResult> => {
+    const response = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email, password: pass, returnTo: sanitizeReturnTo(returnTo) }),
+    });
+
+    const data = await response.json().catch(() => null);
+
+    if (!response.ok || !data?.ok || !data?.session) {
+      return {
+        ok: false,
+        message: data?.message || "Credenciais inválidas. Verifique seu e-mail e senha.",
+      };
+    }
+
+    const nextSession = decodeSessionCookie(encodeSessionCookie(data.session))
+      || buildSession(data.session.email, data.session.mode);
+
+    setSession(nextSession);
+    return {
+      ok: true,
+      returnTo: sanitizeReturnTo(data.returnTo || returnTo),
+    };
+  };
+
+  const logout = async () => {
     try {
-      const session = localStorage.getItem("sil_session");
-      if (session) {
-        const data = JSON.parse(session);
-        if (data?.expiry > Date.now()) {
-          setIsAuthenticated(true);
-        } else {
-          localStorage.removeItem("sil_session");
-        }
-      }
-    } catch {
-      localStorage.removeItem("sil_session");
+      await fetch("/api/auth/logout", { method: "POST" });
+    } finally {
+      setSession(null);
+      mirrorSession(null);
+      router.replace("/login");
     }
-    setLoading(false);
-  }, []);
-
-  useEffect(() => {
-    if (!loading && !isAuthenticated && pathname !== "/login") {
-      router.push("/login");
-    }
-  }, [isAuthenticated, loading, pathname, router]);
-
-  const login = (email: string, pass: string) => {
-    if (canUseDemoLogin(email, pass)) {
-      localStorage.setItem("sil_session", JSON.stringify(buildSession(DEMO_AUTH.email, DEMO_AUTH.mode)));
-      setIsAuthenticated(true);
-      router.replace("/");
-      return true;
-    }
-
-    const adminEmail = (process.env.NEXT_PUBLIC_ADMIN_EMAIL || "").trim().toLowerCase();
-    const adminPass = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "";
-
-    if (canUseProdLogin(email, pass, adminEmail, adminPass)) {
-      localStorage.setItem("sil_session", JSON.stringify(buildSession(email, "prod")));
-      setIsAuthenticated(true);
-      router.replace("/");
-      return true;
-    }
-    return false;
   };
 
-  const logout = () => {
-    localStorage.removeItem("sil_session");
-    setIsAuthenticated(false);
-    router.push("/login");
+  const value: AuthContextType = {
+    session,
+    isAuthenticated: Boolean(session && session.expiry > Date.now()),
+    login,
+    logout,
   };
 
-  return (
-    <AuthContext.Provider value={{ isAuthenticated, login, logout }}>
-      {!loading && (isAuthenticated || pathname === "/login") ? children : (
-        <div className="min-h-screen bg-[#080d12] flex items-center justify-center">
-            <div className="w-12 h-12 border-4 border-[#00d4ff]/20 border-t-[#00d4ff] rounded-full animate-spin"></div>
-        </div>
-      )}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export const useAuth = () => {
