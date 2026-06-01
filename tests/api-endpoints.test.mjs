@@ -3,10 +3,27 @@ import { existsSync, readFileSync } from "node:fs";
 import test from "node:test";
 
 const apiSource = readFileSync(new URL("../src/lib/api.ts", import.meta.url), "utf8");
+const fichasSource = readFileSync(new URL("../src/lib/fichas-operacionais.ts", import.meta.url), "utf8");
+const authSource = readFileSync(new URL("../src/lib/auth.ts", import.meta.url), "utf8");
 
 test("equipment status calls keep /api/equipamentos/status on the client", () => {
   assert.match(apiSource, /equipamentos:\s*\(\)\s*=>\s*fetchResult<Equipamento\[\]>\("\/api\/equipamentos\/status"\)/);
   assert.doesNotMatch(apiSource, /finalPath\s*=\s*"\/api\/equipamentos"/);
+});
+
+test("equipment coordinates are normalized from all accepted shapes", () => {
+  assert.match(apiSource, /resolveEquipmentCoordinates/);
+  assert.match(apiSource, /gps\.lat\/gps\.lng/);
+  assert.match(apiSource, /location\.lat\/location\.lng/);
+  assert.match(apiSource, /inLatitudeRange/);
+  assert.match(apiSource, /inLongitudeRange/);
+});
+
+test("ficha utilities expose integration helpers and generators", () => {
+  assert.match(fichasSource, /gerarCSV/);
+  assert.match(fichasSource, /gerarTXT/);
+  assert.match(fichasSource, /canIntegrateFicha/);
+  assert.match(fichasSource, /buildIntegracaoResumo/);
 });
 
 test("local proxy route exists for /api/equipamentos/status", () => {
@@ -28,10 +45,20 @@ test("map uses configurable equipment icons and menu exposes icon configuration"
 
   assert.match(mapSource, /getIconForModel/);
   assert.match(mapSource, /renderEquipmentIconSvg/);
+  assert.match(mapSource, /resolveEquipmentCoordinates/);
+  assert.match(mapSource, /coords\.hasCoordinates/);
   assert.match(mapSource, /iconAnchor:\s*\[38,\s*95\]/);
   assert.match(mapSource, /border-top:\s*12px solid \${statusColor}/);
   assert.match(sidebarSource, /\/equipamentos\/icones/);
   assert.equal(existsSync(new URL("../src/app/equipamentos/icones/page.tsx", import.meta.url)), true);
+});
+
+test("map page only renders markers for valid coordinates and lists the reason for missing GPS", () => {
+  const mapaSource = readFileSync(new URL("../src/app/mapa/page.tsx", import.meta.url), "utf8");
+
+  assert.match(mapaSource, /resolveEquipmentCoordinates/);
+  assert.match(mapaSource, /coord\.hasCoordinates/);
+  assert.match(mapaSource, /coord\.reason/);
 });
 
 test("operations page does not slice nullable API fields directly", () => {
@@ -41,6 +68,73 @@ test("operations page does not slice nullable API fields directly", () => {
   assert.doesNotMatch(source, /ev\.timestamp\.slice/);
   assert.match(source, /Aguardando sincronização dos APKs/);
   assert.match(source, /Status operacional/);
+});
+
+test("operators page blocks demo writes and supports localStorage CRUD", () => {
+  const source = readFileSync(new URL("../src/app/operadores/page.tsx", import.meta.url), "utf8");
+
+  assert.match(source, /CAN_LOCAL_OPERADORES_CRUD/);
+  assert.match(source, /readLocalOps/);
+  assert.match(source, /writeLocalOps/);
+  assert.match(source, /Ambiente demonstrativo: cadastro real desativado\./);
+  assert.match(source, /Cadastro salvo somente em localStorage para demonstração\./);
+  assert.match(source, /Falha técnica ao salvar operador\./);
+});
+
+test("api/eventos route returns controlled technical empty payload", () => {
+  const routeSource = readFileSync(new URL("../src/app/api/eventos/route.ts", import.meta.url), "utf8");
+
+  assert.match(routeSource, /status_tecnico/);
+  assert.match(routeSource, /Nenhum evento real recebido ainda/);
+  assert.equal(existsSync(new URL("../src/app/api/eventos/route.ts", import.meta.url)), true);
+});
+
+test("recent events route exists and returns empty array when backend is unavailable", () => {
+  const routeSource = readFileSync(new URL("../src/app/api/eventos/recentes/route.ts", import.meta.url), "utf8");
+
+  assert.match(routeSource, /status_tecnico/);
+  assert.match(routeSource, /eventos:\s*\[\]/);
+  assert.equal(existsSync(new URL("../src/app/api/eventos/recentes/route.ts", import.meta.url)), true);
+});
+
+test("operators api route keeps demo and local writes controlled", () => {
+  const routeSource = readFileSync(new URL("../src/app/api/operadores/route.ts", import.meta.url), "utf8");
+
+  assert.match(routeSource, /IS_DEMO/);
+  assert.match(routeSource, /CAN_LOCAL_OPERADORES_CRUD/);
+  assert.match(routeSource, /status_tecnico/);
+  assert.match(routeSource, /Serviço de operadores temporariamente indisponível/);
+});
+
+test("ficha relatorios page exposes integration and export controls", () => {
+  const relatoriosSource = readFileSync(new URL("../src/app/relatorios/page.tsx", import.meta.url), "utf8");
+  const modalSource = readFileSync(new URL("../src/components/relatorios/TipoIntegracaoModal.tsx", import.meta.url), "utf8");
+
+  assert.match(relatoriosSource, /Fichas & Relatórios/);
+  assert.match(relatoriosSource, /Pendentes/);
+  assert.match(relatoriosSource, /Exportadas/);
+  assert.match(relatoriosSource, /Inconsistentes/);
+  assert.match(relatoriosSource, /Horas totais/);
+  assert.match(relatoriosSource, /Indeterminado %/);
+  assert.match(relatoriosSource, /Exportar CSV/);
+  assert.match(relatoriosSource, /Exportar TXT/);
+  assert.match(relatoriosSource, /Integrar Selecionados/);
+  assert.match(relatoriosSource, /Selecionar visíveis/);
+  assert.match(relatoriosSource, /Fichas Operacionais/);
+  assert.match(relatoriosSource, /Histórico/);
+  assert.match(relatoriosSource, /Alterar inconsistência/);
+  assert.match(modalSource, /Tipo de Integração/);
+  assert.match(modalSource, /Banco de Dados/);
+  assert.match(modalSource, /Arquivo de Texto/);
+});
+
+test("ficha operacionais api routes exist including export and integration", () => {
+  assert.equal(existsSync(new URL("../src/app/api/fichas-operacionais/route.ts", import.meta.url)), true);
+  assert.equal(existsSync(new URL("../src/app/api/fichas-operacionais/[idLocal]/route.ts", import.meta.url)), true);
+  assert.equal(existsSync(new URL("../src/app/api/fichas-operacionais/exportar/route.ts", import.meta.url)), true);
+  assert.equal(existsSync(new URL("../src/app/api/fichas-operacionais/integrar/route.ts", import.meta.url)), true);
+  assert.equal(existsSync(new URL("../src/app/api/fichas-operacionais/historico/route.ts", import.meta.url)), true);
+  assert.equal(existsSync(new URL("../src/app/relatorios/fichas-operador/page.tsx", import.meta.url)), true);
 });
 
 test("sidebar exposes Power BI report page", () => {
@@ -86,6 +180,20 @@ test("demo safety files exist and hide local env", () => {
   assert.match(gitignore, /\.next/);
   const wrapper = readFileSync(new URL("../src/components/SidebarWrapper.tsx", import.meta.url), "utf8");
   assert.match(wrapper, /DemoBanner/);
+});
+
+test("demo login credentials are centralized and gated by demo environment", () => {
+  const loginContext = readFileSync(new URL("../src/lib/auth-context.tsx", import.meta.url), "utf8");
+  const loginPage = readFileSync(new URL("../src/app/login/page.tsx", import.meta.url), "utf8");
+
+  assert.match(authSource, /demo@siloops\.com\.br/);
+  assert.match(authSource, /SiloOps@2026/);
+  assert.match(authSource, /IS_DEMO/);
+  assert.match(authSource, /canUseDemoLogin/);
+  assert.match(authSource, /canUseProdLogin/);
+  assert.match(loginContext, /buildSession/);
+  assert.match(loginContext, /router\.replace\("\/"\)/);
+  assert.match(loginPage, /Ambiente demonstrativo ativo/);
 });
 
 test("dashboard premium exposes technical status, events and operations blocks", () => {

@@ -2,6 +2,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import { useAuth } from "@/lib/auth-context";
+import { IS_DEMO } from "@/lib/app-env";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -32,6 +33,12 @@ export default function LoginPage() {
             <p className="text-[#4a6a8a] text-xs uppercase tracking-widest mt-1">Centro de Operações Agrícolas em Tempo Real</p>
           </div>
         </div>
+
+        {IS_DEMO && (
+          <div className="bg-[#00d4ff]/10 border border-[#00d4ff]/20 text-[#8fdfff] text-[11px] px-4 py-3 rounded-xl">
+            Ambiente demonstrativo ativo. O acesso comercial está habilitado para a conta demo.
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="bg-[#111820] border border-[#1e2d3d] rounded-2xl p-6 space-y-6 shadow-2xl">
           {error && (

@@ -1,6 +1,7 @@
 "use client";
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import { DEMO_AUTH, buildSession, canUseDemoLogin, canUseProdLogin } from "@/lib/auth";
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -17,14 +18,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   useEffect(() => {
-    const session = localStorage.getItem("sil_session");
-    if (session) {
-      const data = JSON.parse(session);
-      if (data.expiry > Date.now()) {
-        setIsAuthenticated(true);
-      } else {
-        localStorage.removeItem("sil_session");
+    try {
+      const session = localStorage.getItem("sil_session");
+      if (session) {
+        const data = JSON.parse(session);
+        if (data?.expiry > Date.now()) {
+          setIsAuthenticated(true);
+        } else {
+          localStorage.removeItem("sil_session");
+        }
       }
+    } catch {
+      localStorage.removeItem("sil_session");
     }
     setLoading(false);
   }, []);
@@ -36,14 +41,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [isAuthenticated, loading, pathname, router]);
 
   const login = (email: string, pass: string) => {
-    const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
-    const adminPass = process.env.NEXT_PUBLIC_ADMIN_PASSWORD;
-
-    if (email === adminEmail && pass === adminPass) {
-      const expiry = Date.now() + 1000 * 60 * 60 * 8; // 8 hours
-      localStorage.setItem("sil_session", JSON.stringify({ email, expiry }));
+    if (canUseDemoLogin(email, pass)) {
+      localStorage.setItem("sil_session", JSON.stringify(buildSession(DEMO_AUTH.email, DEMO_AUTH.mode)));
       setIsAuthenticated(true);
-      router.push("/");
+      router.replace("/");
+      return true;
+    }
+
+    const adminEmail = (process.env.NEXT_PUBLIC_ADMIN_EMAIL || "").trim().toLowerCase();
+    const adminPass = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "";
+
+    if (canUseProdLogin(email, pass, adminEmail, adminPass)) {
+      localStorage.setItem("sil_session", JSON.stringify(buildSession(email, "prod")));
+      setIsAuthenticated(true);
+      router.replace("/");
       return true;
     }
     return false;
