@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { IS_DEMO, SITE_URL } from "@/lib/app-env";
-import {
-  getSessionFromRequest,
-} from "@/lib/auth";
+import { decodeSessionCookie, SESSION_COOKIE_NAME } from "@/lib/auth";
 
 const BASE = (process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "").trim().replace(/\/$/, "");
 const TECH_EMPTY = "Nenhum evento real recebido ainda";
@@ -39,7 +37,12 @@ async function fetchUpstream(url: string) {
 }
 
 export async function GET(req: NextRequest) {
-  const session = getSessionFromRequest(req);
+  const sessionCookie = req.cookies.get(SESSION_COOKIE_NAME)?.value;
+  if (!sessionCookie) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  const session = decodeSessionCookie(sessionCookie);
   if (!session) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
