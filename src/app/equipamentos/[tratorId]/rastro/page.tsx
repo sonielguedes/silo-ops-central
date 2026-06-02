@@ -14,6 +14,13 @@ type TrailPoint = GpsPoint & {
   empresa_id?: string | null;
   usina_id?: string | null;
   unidade_id?: string | null;
+  estado_operacional?: string | null;
+  codigo_parada?: string | null;
+  descricao_parada?: string | null;
+  operacao_id?: string | null;
+  operacao_nome?: string | null;
+  evento_status?: string | null;
+  motivo_status?: string | null;
 };
 
 type PeriodPreset = "6h" | "24h" | "72h" | "7d" | "all" | "custom";
@@ -195,6 +202,11 @@ export default function EquipamentoRastroPage() {
                       <div className="grid grid-cols-2 gap-2 text-xs">
                         <div><span className="text-[#4a6a8a]">Velocidade</span><div className="text-[#c8d8e8] font-mono">{point.velocidade ?? "--"}</div></div>
                         <div><span className="text-[#4a6a8a]">Origem</span><div className="text-[#c8d8e8] font-mono">{point.origem || "--"}</div></div>
+                        <div><span className="text-[#4a6a8a]">Estado operacional</span><div className="text-[#c8d8e8] font-mono">{point.estado_operacional || "UNKNOWN"}</div></div>
+                        <div><span className="text-[#4a6a8a]">Operação</span><div className="text-[#c8d8e8] font-mono">{point.operacao_nome || point.operacao_id || "--"}</div></div>
+                        <div><span className="text-[#4a6a8a]">Código de parada</span><div className="text-[#c8d8e8] font-mono">{point.codigo_parada || "--"}</div></div>
+                        <div><span className="text-[#4a6a8a]">Evento / motivo</span><div className="text-[#c8d8e8] font-mono">{point.evento_status || point.motivo_status || "--"}</div></div>
+                        <div className="col-span-2"><span className="text-[#4a6a8a]">Descrição da parada</span><div className="text-[#c8d8e8] font-mono">{point.descricao_parada || "--"}</div></div>
                         <div className="col-span-2"><span className="text-[#4a6a8a]">Coordenadas</span><div className="text-[#c8d8e8] font-mono">{point.latitude.toFixed(6)}, {point.longitude.toFixed(6)}</div></div>
                       </div>
                     </div>

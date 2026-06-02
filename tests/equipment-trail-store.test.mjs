@@ -221,3 +221,86 @@ test("equipment trail store drops near-identical stationary points but keeps rea
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("equipment trail store derives operational state and stop metadata from raw records", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "silo-trail-store-"));
+  const storePath = join(dir, "equipment-trail.json");
+
+  try {
+    const mod = await loadStoreModule(storePath);
+
+    const stopped = mod.buildTrailPointFromRecord({
+      trator_id: "T01",
+      timestamp: "2026-06-02T10:10:00.000Z",
+      latitude: -10.1,
+      longitude: -50.2,
+      velocidade: 0.3,
+      status: "PARADA",
+      operacao_id: "OP123",
+      operacao_nome: "Colheita",
+      codigo_parada: "P01",
+      descricao_parada: "Parada para abastecimento",
+      evento_status: "PARADA",
+      motivo_status: "Abastecimento",
+      origem: "status",
+      empresa_id: "SILOOPS",
+      usina_id: "USINA_PADRAO",
+      unidade_id: "UNIDADE_PADRAO",
+    }, "T01", "status");
+
+    assert.equal(stopped?.estado_operacional, "PARADO");
+    assert.equal(stopped?.codigo_parada, "P01");
+    assert.equal(stopped?.descricao_parada, "Parada para abastecimento");
+    assert.equal(stopped?.operacao_id, "OP123");
+    assert.equal(stopped?.operacao_nome, "Colheita");
+    assert.equal(stopped?.evento_status, "PARADA");
+    assert.equal(stopped?.motivo_status, "Abastecimento");
+
+    const moving = mod.buildTrailPointFromRecord({
+      trator_id: "T01",
+      timestamp: "2026-06-02T10:11:00.000Z",
+      latitude: -10.2,
+      longitude: -50.3,
+      velocidade: 6.2,
+      origem: "status",
+      empresa_id: "SILOOPS",
+      usina_id: "USINA_PADRAO",
+      unidade_id: "UNIDADE_PADRAO",
+    }, "T01", "status");
+
+    assert.equal(moving?.estado_operacional, "EM_MOVIMENTO");
+
+    const working = mod.buildTrailPointFromRecord({
+      trator_id: "T01",
+      timestamp: "2026-06-02T10:12:00.000Z",
+      latitude: -10.2,
+      longitude: -50.3,
+      velocidade: 0.8,
+      operacao_atual: "Plantio",
+      operacao_id: "OP999",
+      origem: "status",
+      empresa_id: "SILOOPS",
+      usina_id: "USINA_PADRAO",
+      unidade_id: "UNIDADE_PADRAO",
+    }, "T01", "status");
+
+    assert.equal(working?.estado_operacional, "TRABALHANDO");
+    assert.equal(working?.operacao_nome, "Plantio");
+
+    const idle = mod.buildTrailPointFromRecord({
+      trator_id: "T01",
+      timestamp: "2026-06-02T10:13:00.000Z",
+      latitude: -10.2,
+      longitude: -50.3,
+      velocidade: 0,
+      origem: "status",
+      empresa_id: "SILOOPS",
+      usina_id: "USINA_PADRAO",
+      unidade_id: "UNIDADE_PADRAO",
+    }, "T01", "status");
+
+    assert.equal(idle?.estado_operacional, "SEM_OPERACAO");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

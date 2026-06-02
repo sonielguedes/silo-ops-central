@@ -50,6 +50,7 @@ test("equipment trail page and proxy route exist with cookie guard and tenant-sa
   assert.match(routeSource, /limit/);
   assert.match(routeSource, /telemetria/);
   assert.match(routeSource, /api\/equipamentos\/status/);
+  assert.match(routeSource, /enrichTrailPointWithOperationalContext/);
   assert.equal(existsSync(new URL("../src/app/equipamentos/[tratorId]/rastro/page.tsx", import.meta.url)), true);
 });
 
@@ -66,6 +67,11 @@ test("equipment trail page handles empty API payload without indexing points", (
   assert.match(trailMapSource, /points\.length === 0/);
   assert.match(trailMapSource, /emptyMessage/);
   assert.match(trailMapSource, /Posi.*atual/);
+  assert.match(pageSource, /Estado operacional/);
+  assert.match(pageSource, /Código de parada/);
+  assert.match(pageSource, /Descrição da parada/);
+  assert.match(pageSource, /Operação/);
+  assert.match(pageSource, /Evento \/ motivo/);
 });
 
 test("/api/equipamentos/status requires session and returns unauthorized JSON", () => {

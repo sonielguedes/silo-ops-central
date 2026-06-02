@@ -3,6 +3,7 @@ import { IS_DEMO, SITE_URL } from "@/lib/app-env";
 import { normalizeEquipmentList } from "@/lib/api";
 import { filterItemsBySessionScope, getScopeFilter, getSessionFromRequest, isAdminGlobal } from "@/lib/auth";
 import { appendEquipmentTrailPoints, buildTrailPointFromRecord, queryEquipmentTrailPoints } from "@/lib/equipment-trail-store";
+import { enrichTrailPointWithOperationalContext } from "@/lib/equipment-status-trail";
 
 const BASE = (process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000").trim().replace(/\/$/, "");
 type TrailPoint = NonNullable<ReturnType<typeof buildTrailPointFromRecord>>;
@@ -66,6 +67,10 @@ function dedupeAndSort(points: TrailPoint[]) {
     .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 }
 
+function enrichPoints(points: TrailPoint[]) {
+  return points.map((point) => enrichTrailPointWithOperationalContext(point));
+}
+
 async function fetchJson(url: string) {
   const res = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(9000) });
   const text = await res.text();
@@ -103,7 +108,7 @@ export async function GET(
     const scope = getScopeFilter(session);
     const cachedPoints = await queryEquipmentTrailPoints({ tratorId, from, to, limit, session });
     if (cachedPoints.length > 0) {
-      return NextResponse.json(cachedPoints, { status: 200 });
+      return NextResponse.json(enrichPoints(cachedPoints), { status: 200 });
     }
 
     const query = new URLSearchParams();
@@ -156,7 +161,7 @@ export async function GET(
       : filterItemsBySessionScope(points, session);
 
     const ranged = filterTrailByRange(scoped, from, to);
-    const output = dedupeAndSort(ranged).slice(0, limit);
+    const output = enrichPoints(dedupeAndSort(ranged).slice(0, limit));
 
     return NextResponse.json(output, { status: 200 });
   } catch (err) {

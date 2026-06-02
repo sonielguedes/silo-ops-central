@@ -1,26 +1,24 @@
 import { IS_DEMO, SITE_URL } from "@/lib/app-env";
-import { normalizeEquipmentList } from "@/lib/api";
-import { normalizeScopeFields } from "@/lib/auth";
-import { appendEquipmentTrailPoints, buildTrailPointFromRecord } from "@/lib/equipment-trail-store";
+import { appendEquipmentTrailPoints, buildTrailPointFromRecord, type TrailPoint } from "@/lib/equipment-trail-store";
 
 const B = (process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000").trim().replace(/\/$/, "");
 const ENDPOINT = "/api/equipamentos/status";
 
-function withScope(items: ReturnType<typeof normalizeEquipmentList>) {
-  return items.map((item) => ({
-    ...item,
-    ...normalizeScopeFields({
-      empresa_id: (item as any).empresa_id,
-      usina_id: (item as any).usina_id,
-      unidade_id: (item as any).unidade_id,
-    }),
-  }));
+function extractItems(payload: unknown): Record<string, unknown>[] {
+  if (Array.isArray(payload)) return payload as Record<string, unknown>[];
+  if (!payload || typeof payload !== "object") return [];
+  const candidates = ["pontos", "rastro", "telemetria", "eventos", "items", "data", "rows", "registros", "results", "equipamentos"];
+  for (const key of candidates) {
+    const value = (payload as Record<string, unknown>)[key];
+    if (Array.isArray(value)) return value as Record<string, unknown>[];
+  }
+  return [];
 }
 
 export function collectTrailPointsFromEquipmentStatus(payload: unknown) {
-  const normalized = withScope(normalizeEquipmentList(payload));
-  return normalized
-    .map((item) => buildTrailPointFromRecord(item as unknown as Record<string, unknown>, item.trator_id, "status"))
+  const rawItems = extractItems(payload);
+  return rawItems
+    .map((item) => buildTrailPointFromRecord(item, String(item.trator_id || item.equipamento_id || item.id || "trail"), "status"))
     .filter((item): item is NonNullable<typeof item> => Boolean(item));
 }
 
@@ -30,6 +28,10 @@ export async function persistTrailPointsFromEquipmentStatus(payload: unknown) {
     await appendEquipmentTrailPoints(points);
   }
   return points;
+}
+
+export function enrichTrailPointWithOperationalContext(point: TrailPoint) {
+  return buildTrailPointFromRecord(point as unknown as Record<string, unknown>, point.trator_id, point.origem || "status") || point;
 }
 
 export async function fetchEquipmentStatusSnapshot() {

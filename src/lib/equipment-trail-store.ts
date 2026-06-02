@@ -14,6 +14,13 @@ export type TrailPoint = {
   empresa_id: string;
   usina_id: string;
   unidade_id: string;
+  estado_operacional?: "TRABALHANDO" | "PARADO" | "EM_MOVIMENTO" | "SEM_OPERACAO" | "UNKNOWN" | null;
+  codigo_parada?: string | null;
+  descricao_parada?: string | null;
+  operacao_id?: string | null;
+  operacao_nome?: string | null;
+  evento_status?: string | null;
+  motivo_status?: string | null;
 };
 
 export interface TrailStore {
@@ -43,6 +50,10 @@ function nowIso() {
 
 function scopeValue(value: unknown, fallback: string): string {
   return typeof value === "string" && value.trim() ? value.trim() : fallback;
+}
+
+function textValue(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
 function toFiniteNumber(value: unknown): number | null {
@@ -112,6 +123,84 @@ function normalizePoint(point: Partial<TrailPoint>): TrailPoint | null {
     empresa_id: scopeValue(point.empresa_id, "SILOOPS"),
     usina_id: scopeValue(point.usina_id, "USINA_PADRAO"),
     unidade_id: scopeValue(point.unidade_id, "UNIDADE_PADRAO"),
+    estado_operacional: textValue(point.estado_operacional) as TrailPoint["estado_operacional"],
+    codigo_parada: textValue(point.codigo_parada),
+    descricao_parada: textValue(point.descricao_parada),
+    operacao_id: textValue(point.operacao_id),
+    operacao_nome: textValue(point.operacao_nome),
+    evento_status: textValue(point.evento_status),
+    motivo_status: textValue(point.motivo_status),
+  };
+}
+
+function normalizeOperationalStatus(value: unknown): TrailPoint["estado_operacional"] | null {
+  const normalized = textValue(value)?.toUpperCase() || null;
+  if (!normalized) return null;
+  if (["TRABALHANDO", "PARADO", "EM_MOVIMENTO", "SEM_OPERACAO", "UNKNOWN"].includes(normalized)) {
+    return normalized as TrailPoint["estado_operacional"];
+  }
+  return null;
+}
+
+function hasStopSignal(item: Record<string, unknown>, point?: Partial<TrailPoint> | null) {
+  const pool = [
+    item.codigo_parada,
+    item.descricao_parada,
+    item.motivo_parada,
+    item.stop_code,
+    item.stop_reason,
+    item.descricao,
+    item.mensagem,
+    item.reason,
+    item.parada,
+    item.parada_descricao,
+    item.evento_status,
+    item.motivo_status,
+    item.status,
+    point?.codigo_parada,
+    point?.descricao_parada,
+    point?.evento_status,
+    point?.motivo_status,
+    point?.status,
+  ];
+  return pool.some((value) => {
+    const text = textValue(value)?.toUpperCase();
+    if (!text) return false;
+    return /PARAD|STOP|STOPPED|PAUS|ABAST|MANUT|DESCANS|FALHA/.test(text);
+  });
+}
+
+function inferOperationalState(item: Record<string, unknown>, point: Partial<TrailPoint>): TrailPoint["estado_operacional"] {
+  const explicit = normalizeOperationalStatus(item.estado_operacional ?? point.estado_operacional);
+  if (explicit) return explicit;
+
+  const velocidade = Number(point.velocidade ?? item.velocidade ?? item.speed ?? 0);
+  const operacaoId = textValue(item.operacao_id ?? point.operacao_id);
+  const operacaoNome = textValue(item.operacao_nome ?? item.operacao_atual ?? item.operacao ?? point.operacao_nome);
+  const stop = hasStopSignal(item, point);
+  if (stop) return "PARADO";
+  if (velocidade > 5) return "EM_MOVIMENTO";
+  if (operacaoId || operacaoNome) return "TRABALHANDO";
+  if (!operacaoId && !operacaoNome) return "SEM_OPERACAO";
+  return "UNKNOWN";
+}
+
+export function buildOperationalTrailFields(item: Record<string, unknown>, point: Partial<TrailPoint>): Pick<TrailPoint, "estado_operacional" | "codigo_parada" | "descricao_parada" | "operacao_id" | "operacao_nome" | "evento_status" | "motivo_status"> {
+  const operacaoId = textValue(item.operacao_id ?? point.operacao_id);
+  const operacaoNome = textValue(item.operacao_nome ?? item.operacao_atual ?? item.operacao ?? point.operacao_nome);
+  const codigoParada = textValue(item.codigo_parada ?? item.stop_code ?? point.codigo_parada);
+  const descricaoParada = textValue(item.descricao_parada ?? item.motivo_parada ?? item.stop_reason ?? item.descricao ?? item.mensagem ?? point.descricao_parada);
+  const eventoStatus = textValue(item.evento_status ?? item.status ?? item.tipo_evento ?? point.evento_status);
+  const motivoStatus = textValue(item.motivo_status ?? item.motivo ?? item.descricao ?? item.mensagem ?? item.reason ?? point.motivo_status);
+
+  return {
+    estado_operacional: inferOperationalState(item, point),
+    codigo_parada: codigoParada,
+    descricao_parada: descricaoParada,
+    operacao_id: operacaoId,
+    operacao_nome: operacaoNome,
+    evento_status: eventoStatus,
+    motivo_status: motivoStatus,
   };
 }
 
@@ -150,6 +239,18 @@ export function buildTrailPointFromRecord(item: Record<string, unknown>, fallbac
     : typeof item.source === "string"
       ? item.source.trim() || null
       : source;
+  const operational = buildOperationalTrailFields(item, {
+    trator_id: String(item.trator_id || item.equipamento_id || item.id || fallbackTratorId).trim() || fallbackTratorId,
+    timestamp: new Date(timestampMs).toISOString(),
+    latitude,
+    longitude,
+    velocidade,
+    status,
+    origem,
+    empresa_id: scopeValue(item.empresa_id, "SILOOPS"),
+    usina_id: scopeValue(item.usina_id, "USINA_PADRAO"),
+    unidade_id: scopeValue(item.unidade_id, "UNIDADE_PADRAO"),
+  });
 
   return {
     trator_id: String(item.trator_id || item.equipamento_id || item.id || fallbackTratorId).trim() || fallbackTratorId,
@@ -162,6 +263,7 @@ export function buildTrailPointFromRecord(item: Record<string, unknown>, fallbac
     empresa_id: scopeValue(item.empresa_id, "SILOOPS"),
     usina_id: scopeValue(item.usina_id, "USINA_PADRAO"),
     unidade_id: scopeValue(item.unidade_id, "UNIDADE_PADRAO"),
+    ...operational,
   };
 }
 
@@ -175,8 +277,14 @@ function shouldDropJitter(prev: TrailPoint | undefined, next: TrailPoint) {
   const nextSpeed = Number(next.velocidade ?? 0);
   const prevStatus = (prev.status || "").trim();
   const nextStatus = (next.status || "").trim();
+  const prevOperational = (prev.estado_operacional || "").trim();
+  const nextOperational = (next.estado_operacional || "").trim();
+  const prevStopCode = (prev.codigo_parada || "").trim();
+  const nextStopCode = (next.codigo_parada || "").trim();
+  const prevOperation = (prev.operacao_id || "").trim();
+  const nextOperation = (next.operacao_id || "").trim();
   const distance = haversineMeters(prev, next);
-  return distance < 5 && prevStatus === nextStatus && prevSpeed <= 1 && nextSpeed <= 1;
+  return distance < 5 && prevStatus === nextStatus && prevOperational === nextOperational && prevStopCode === nextStopCode && prevOperation === nextOperation && prevSpeed <= 1 && nextSpeed <= 1;
 }
 
 function trimStore(points: TrailPoint[]) {
