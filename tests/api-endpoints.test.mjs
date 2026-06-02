@@ -216,6 +216,8 @@ test("demo login credentials are centralized and gated by demo environment", () 
   assert.match(authSource, /canUseProdLogin/);
   assert.match(authSource, /SESSION_COOKIE_NAME/);
   assert.match(authSource, /OFFICIAL_PROD_AUTH/);
+  assert.match(authSource, /normalizeRole/);
+  assert.match(authSource, /admin:\s*"ADMIN_GLOBAL"/);
   assert.match(authSource, /isAdminGlobal/);
   assert.match(authSource, /canAccessModule/);
   assert.match(authSource, /getSessionFromRequest/);
