@@ -303,6 +303,49 @@ test("viewer seed exists with tenant scope and read-only permissions", () => {
   assert.match(source, /viewer@siloops\.com\.br/);
 });
 
+test("tenant isolation keeps ADMIN_GLOBAL broad and VIEWER constrained to default scope", () => {
+  const authSource = readFileSync(new URL("../src/lib/auth.ts", import.meta.url), "utf8");
+  const eventsSource = readFileSync(new URL("../src/app/api/eventos/route.ts", import.meta.url), "utf8");
+  const operacoesSource = readFileSync(new URL("../src/app/api/operacoes/route.ts", import.meta.url), "utf8");
+  const ativasSource = readFileSync(new URL("../src/app/api/operacoes/ativas/route.ts", import.meta.url), "utf8");
+  const equipamentosSource = readFileSync(new URL("../src/app/api/equipamentos/status/route.ts", import.meta.url), "utf8");
+
+  assert.match(authSource, /export function filterItemsBySessionScope/);
+  assert.match(eventsSource, /filterItemsBySessionScope/);
+  assert.match(operacoesSource, /filterItemsBySessionScope/);
+  assert.match(ativasSource, /filterItemsBySessionScope/);
+  assert.match(equipamentosSource, /filterItemsBySessionScope/);
+
+  const items = [
+    { id: "default", empresa_id: "SILOOPS", usina_id: "USINA_PADRAO", unidade_id: "UNIDADE_PADRAO" },
+    { id: "blocked", empresa_id: "SILOOPS", usina_id: "USINA_TESTE_BLOQUEADA", unidade_id: "UNIDADE_TESTE_BLOQUEADA" },
+    { id: "legacy" },
+  ];
+  const viewer = {
+    role: "VIEWER",
+    empresa_id: "SILOOPS",
+    usinas: ["USINA_PADRAO"],
+    unidades: ["UNIDADE_PADRAO"],
+  };
+  const admin = { role: "ADMIN_GLOBAL" };
+
+  const scopeLike = (rows, profile) => {
+    if (!profile || profile.role === "ADMIN_GLOBAL") return rows;
+    return rows.filter((item) => {
+      const empresa_id = item.empresa_id || "SILOOPS";
+      const usina_id = item.usina_id || "USINA_PADRAO";
+      const unidade_id = item.unidade_id || "UNIDADE_PADRAO";
+      return empresa_id === profile.empresa_id
+        && (profile.usinas.includes("*") || profile.usinas.includes(usina_id))
+        && (profile.unidades.includes("*") || profile.unidades.includes(unidade_id));
+    });
+  };
+
+  assert.deepEqual(scopeLike(items, admin).map((item) => item.id), ["default", "blocked", "legacy"]);
+  assert.deepEqual(scopeLike(items, viewer).map((item) => item.id), ["default", "legacy"]);
+  assert.doesNotMatch(JSON.stringify(scopeLike(items, viewer)), /USINA_TESTE_BLOQUEADA|UNIDADE_TESTE_BLOQUEADA/);
+});
+
 test("dashboard premium exposes technical status, events and operations blocks", () => {
   const dashboardSource = readFileSync(new URL("../src/app/page.tsx", import.meta.url), "utf8");
   const typesSource = readFileSync(new URL("../src/lib/dashboard-types.ts", import.meta.url), "utf8");

@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { IS_DEMO, SITE_URL } from "@/lib/app-env";
 import {
   applyScopeToUrl,
+  filterItemsBySessionScope,
   getScopeFilter,
   getSessionFromRequest,
-  isAdminGlobal,
   normalizeScopeFields,
 } from "@/lib/auth";
 
@@ -76,13 +76,7 @@ export async function GET(req: NextRequest) {
       console.error("[SIL] /api/eventos upstream failed", { status: res.status, url });
       return tech(res.status, "upstream-not-ok");
     }
-    const eventos = normalizeEventos(data).filter((item) => {
-      if (!scope || isAdminGlobal(session)) return true;
-      const empresaOk = !scope.empresa_id || item.empresa_id === scope.empresa_id;
-      const usinaOk = !scope.usina_ids?.length || scope.usina_ids.includes("*") || scope.usina_ids.includes(item.usina_id);
-      const unidadeOk = !scope.unidade_ids?.length || scope.unidade_ids.includes("*") || scope.unidade_ids.includes(item.unidade_id);
-      return empresaOk && usinaOk && unidadeOk;
-    });
+    const eventos = filterItemsBySessionScope(normalizeEventos(data), session);
     return NextResponse.json(
       { eventos, status_tecnico: "ok", upstream_status: res.status },
       { status: 200 }

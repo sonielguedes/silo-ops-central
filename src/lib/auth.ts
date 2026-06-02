@@ -86,6 +86,12 @@ export interface ScopeFilter {
   unidade_ids?: string[];
 }
 
+export interface ScopedRecord {
+  empresa_id?: string;
+  usina_id?: string;
+  unidade_id?: string;
+}
+
 export interface UserSeed {
   email: string;
   name: string;
@@ -237,6 +243,20 @@ export function normalizeScopeFields(input?: Partial<ScopeFields> | null): Scope
     usina_id: input?.usina_id || "USINA_PADRAO",
     unidade_id: input?.unidade_id || "UNIDADE_PADRAO",
   };
+}
+
+export function filterItemsBySessionScope<T extends ScopedRecord>(items: T[], profile: SessionPayload | null) {
+  if (!profile || isAdminGlobal(profile)) return items;
+  const scope = getScopeFilter(profile);
+  if (!scope) return items;
+
+  return items.filter((item) => {
+    const normalized = normalizeScopeFields(item);
+    const empresaOk = !scope.empresa_id || normalized.empresa_id === scope.empresa_id;
+    const usinaOk = !scope.usina_ids?.length || scope.usina_ids.includes("*") || scope.usina_ids.includes(normalized.usina_id);
+    const unidadeOk = !scope.unidade_ids?.length || scope.unidade_ids.includes("*") || scope.unidade_ids.includes(normalized.unidade_id);
+    return empresaOk && usinaOk && unidadeOk;
+  });
 }
 
 export function getSessionFromRequest(request: NextRequest): SessionPayload | null {

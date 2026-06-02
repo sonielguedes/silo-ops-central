@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { IS_DEMO, SITE_URL } from "@/lib/app-env";
 import { normalizeEquipmentList } from "@/lib/api";
-import { getScopeFilter, getSessionFromRequest, isAdminGlobal, normalizeScopeFields } from "@/lib/auth";
+import { filterItemsBySessionScope, getSessionFromRequest, normalizeScopeFields } from "@/lib/auth";
 
 const B = (process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000").trim().replace(/\/$/, "");
 const ENDPOINT = "/api/equipamentos/status";
@@ -27,7 +27,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json([], { status: 200 });
   }
 
-  const scope = getScopeFilter(session);
   const url = `${B}${ENDPOINT}`;
 
   try {
@@ -40,13 +39,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json([], { status: 200 });
     }
 
-    const items = withScope(normalizeEquipmentList(data)).filter((item: any) => {
-      if (!scope || isAdminGlobal(session)) return true;
-      const empresaOk = !scope.empresa_id || item.empresa_id === scope.empresa_id;
-      const usinaOk = !scope.usina_ids?.length || scope.usina_ids.includes("*") || scope.usina_ids.includes(item.usina_id);
-      const unidadeOk = !scope.unidade_ids?.length || scope.unidade_ids.includes("*") || scope.unidade_ids.includes(item.unidade_id);
-      return empresaOk && usinaOk && unidadeOk;
-    });
+    const items = filterItemsBySessionScope(withScope(normalizeEquipmentList(data)), session);
 
     return NextResponse.json(items, { status: 200 });
   } catch (e) {
