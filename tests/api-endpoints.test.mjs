@@ -86,6 +86,8 @@ test("operators page blocks demo writes and supports localStorage CRUD", () => {
 test("api/eventos route returns controlled technical empty payload", () => {
   const routeSource = readFileSync(new URL("../src/app/api/eventos/route.ts", import.meta.url), "utf8");
 
+  assert.match(routeSource, /getSessionFromRequest/);
+  assert.match(routeSource, /error:\s*"unauthorized"/);
   assert.match(routeSource, /IS_DEMO/);
   assert.match(routeSource, /status_tecnico/);
   assert.match(routeSource, /Nenhum evento real recebido ainda/);
