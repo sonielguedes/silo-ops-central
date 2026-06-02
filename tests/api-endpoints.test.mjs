@@ -30,6 +30,14 @@ test("local proxy route exists for /api/equipamentos/status", () => {
   assert.equal(existsSync(new URL("../src/app/api/equipamentos/status/route.ts", import.meta.url)), true);
 });
 
+test("/api/equipamentos/status requires session and returns unauthorized JSON", () => {
+  const routeSource = readFileSync(new URL("../src/app/api/equipamentos/status/route.ts", import.meta.url), "utf8");
+
+  assert.match(routeSource, /getSessionFromRequest/);
+  assert.match(routeSource, /error:\s*"unauthorized"/);
+  assert.doesNotMatch(routeSource, /message:\s*"Sessão inválida ou ausente\."|message:\s*"SessÃ£o invÃ¡lida ou ausente\."/);
+});
+
 test("health proxy reports degraded/down instead of throwing raw upstream failures", () => {
   const healthSource = readFileSync(new URL("../src/app/api/health/route.ts", import.meta.url), "utf8");
 
