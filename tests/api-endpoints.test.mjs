@@ -242,6 +242,30 @@ test("sidebar only exposes production-ready routes", () => {
   });
 });
 
+test("admin tenant pages expose premium CRUD layout and tenant-aware loading", () => {
+  const empresasPage = readFileSync(new URL("../src/app/admin/empresas/page.tsx", import.meta.url), "utf8");
+  const usinasPage = readFileSync(new URL("../src/app/admin/usinas/page.tsx", import.meta.url), "utf8");
+  const unidadesPage = readFileSync(new URL("../src/app/admin/unidades/page.tsx", import.meta.url), "utf8");
+  const helperSource = readFileSync(new URL("../src/lib/admin-tenant-client.ts", import.meta.url), "utf8");
+
+  [empresasPage, usinasPage, unidadesPage].forEach((source) => {
+    assert.match(source, /Header/);
+    assert.match(source, /SectionHeader/);
+    assert.match(source, /StatCard/);
+    assert.match(source, /Atualizar/);
+    assert.match(source, /Acesso restrito/);
+    assert.match(source, /fetchJson/);
+  });
+
+  assert.match(empresasPage, /\/api\/admin\/empresas/);
+  assert.match(usinasPage, /\/api\/admin\/usinas/);
+  assert.match(usinasPage, /\/api\/admin\/empresas/);
+  assert.match(unidadesPage, /\/api\/admin\/unidades/);
+  assert.match(unidadesPage, /\/api\/admin\/usinas/);
+  assert.match(helperSource, /isTenantAdmin/);
+  assert.match(helperSource, /fetchJson/);
+});
+
 test("demo safety files exist and hide local env", () => {
   assert.equal(existsSync(new URL("../.env.example", import.meta.url)), true);
   const gitignore = readFileSync(new URL("../.gitignore", import.meta.url), "utf8");
