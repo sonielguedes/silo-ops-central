@@ -30,6 +30,24 @@ test("local proxy route exists for /api/equipamentos/status", () => {
   assert.equal(existsSync(new URL("../src/app/api/equipamentos/status/route.ts", import.meta.url)), true);
 });
 
+test("equipment trail page and proxy route exist with cookie guard and tenant-safe rendering", () => {
+  const pageSource = readFileSync(new URL("../src/app/equipamentos/[tratorId]/rastro/page.tsx", import.meta.url), "utf8");
+  const routeSource = readFileSync(new URL("../src/app/api/equipamentos/[tratorId]/rastro/route.ts", import.meta.url), "utf8");
+
+  assert.match(pageSource, /TrailMap/);
+  assert.match(pageSource, /Km estimado/);
+  assert.match(pageSource, /Tempo total/);
+  assert.match(pageSource, /Primeira posição/);
+  assert.match(pageSource, /Última posição/);
+  assert.match(pageSource, /Período/);
+  assert.match(pageSource, /Voltar para Equipamentos/);
+  assert.match(routeSource, /getSessionFromRequest/);
+  assert.match(routeSource, /error:\s*"unauthorized"/);
+  assert.match(routeSource, /getScopeFilter/);
+  assert.match(routeSource, /isAdminGlobal/);
+  assert.equal(existsSync(new URL("../src/app/equipamentos/[tratorId]/rastro/page.tsx", import.meta.url)), true);
+});
+
 test("/api/equipamentos/status requires session and returns unauthorized JSON", () => {
   const routeSource = readFileSync(new URL("../src/app/api/equipamentos/status/route.ts", import.meta.url), "utf8");
 

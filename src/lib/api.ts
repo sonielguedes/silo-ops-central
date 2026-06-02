@@ -1,6 +1,7 @@
 ﻿import type { EventoOperacional } from "@/lib/dashboard-types";
 
 const API = (process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000").trim().replace(/\/$/, "");
+const SHOULD_LOG_API_WARNINGS = process.env.NODE_ENV !== "production";
 
 export interface HealthResponse {
   status: string;
@@ -39,6 +40,11 @@ export interface GpsPoint {
   longitude: number;
   velocidade?: number | null;
   timestamp: string;
+  status?: string | null;
+  origem?: string | null;
+  empresa_id?: string | null;
+  usina_id?: string | null;
+  unidade_id?: string | null;
 }
 
 export interface OutboxItem {
@@ -191,7 +197,7 @@ export async function fetchResult<T>(path: string): Promise<ApiResult<T>> {
 
     if (!res.ok) {
       const errorMsg = `HTTP ${res.status} em ${finalPath}`;
-      console.warn(`[SIL] API Warning: ${errorMsg}`);
+      if (SHOULD_LOG_API_WARNINGS) console.warn(`[SIL] API Warning: ${errorMsg}`);
       if (finalPath.startsWith("/api/eventos")) {
         return { ok: true, data: [] as unknown as T };
       }
@@ -218,13 +224,13 @@ export async function fetchResult<T>(path: string): Promise<ApiResult<T>> {
     } catch (parseErr) {
       // Se não for JSON, pode ser um erro HTML do servidor
       if (text.includes("<!DOCTYPE") || text.includes("<html")) {
-         console.warn(`[SIL] API returned HTML instead of JSON from ${finalPath}`);
+         if (SHOULD_LOG_API_WARNINGS) console.warn(`[SIL] API returned HTML instead of JSON from ${finalPath}`);
          if (finalPath === "/api/equipamentos/status") {
            return { ok: true, data: [] as unknown as T };
          }
          return { ok: false, error: "Servidor retornou erro (HTML)" };
       }
-      console.warn(`[SIL] JSON Parse Error em ${finalPath}`, parseErr);
+      if (SHOULD_LOG_API_WARNINGS) console.warn(`[SIL] JSON Parse Error em ${finalPath}`, parseErr);
       return { ok: false, error: "Erro no formato dos dados" };
     }
   } catch (err) {
@@ -232,7 +238,7 @@ export async function fetchResult<T>(path: string): Promise<ApiResult<T>> {
     const errorMessage = err instanceof Error ? err.message : String(err);
 
     if (errorName === "TimeoutError") {
-      console.warn(`[SIL] Timeout 10s em ${finalPath}`);
+      if (SHOULD_LOG_API_WARNINGS) console.warn(`[SIL] Timeout 10s em ${finalPath}`);
       if (finalPath === "/api/equipamentos/status") {
         return { ok: true, data: [] as unknown as T };
       }
@@ -240,7 +246,7 @@ export async function fetchResult<T>(path: string): Promise<ApiResult<T>> {
     }
 
     // "Failed to fetch" geralmente é rede ou CORS
-    console.warn(`[SIL] Fetch suppressed em ${finalPath}: ${errorMessage}`);
+    if (SHOULD_LOG_API_WARNINGS) console.warn(`[SIL] Fetch suppressed em ${finalPath}: ${errorMessage}`);
     if (finalPath === "/api/equipamentos/status") {
       return { ok: true, data: [] as unknown as T };
     }
@@ -258,6 +264,15 @@ export const api = {
 };
 
 export type PresenceStatus = "ONLINE" | "INSTAVEL" | "OFFLINE";
+export interface PresenceInfo {
+  label: PresenceStatus;
+  color: string;
+}
+export type OperationalPresenceStatus = "ONLINE" | "INSTAVEL" | "OFFLINE" | "SEM SINAL";
+export interface OperationalPresenceInfo {
+  label: OperationalPresenceStatus;
+  color: string;
+}
 export function getPresence(raw: string | null | undefined): PresenceStatus {
   const v = (raw || "").toUpperCase().trim();
   if (v === "ONLINE") return "ONLINE";
@@ -271,6 +286,18 @@ export function getDynamicPresence(lastSeenIso: string | null | undefined): Pres
   if (diff <= 30) return "ONLINE";
   if (diff <= 90) return "INSTAVEL";
   return "OFFLINE";
+}
+
+export function getPresenceInfo(lastSeenIso: string | null | undefined): PresenceInfo {
+  const label = getDynamicPresence(lastSeenIso);
+  const color = label === "ONLINE" ? "#00e676" : label === "INSTAVEL" ? "#ffab00" : "#ff3d57";
+  return { label, color };
+}
+export function getOperationalPresenceInfo(lastSeenIso: string | null | undefined): OperationalPresenceInfo {
+  if (!lastSeenIso) return { label: "SEM SINAL", color: "#6b7280" };
+  const label = getDynamicPresence(lastSeenIso);
+  const color = label === "ONLINE" ? "#00e676" : label === "INSTAVEL" ? "#ffab00" : "#ff3d57";
+  return { label, color };
 }
 
 export function timeAgo(iso: string | null | undefined): string {
