@@ -10,6 +10,10 @@ Documentar o tenant scope real usado nas rotas operacionais da Central SILO OPS.
 - `src/app/api/equipamentos/status/route.ts`
 - `src/app/api/operacoes/route.ts`
 - `src/app/api/operacoes/ativas/route.ts`
+- `src/lib/admin-tenant-store.ts`
+- `src/app/api/admin/empresas/route.ts`
+- `src/app/api/admin/usinas/route.ts`
+- `src/app/api/admin/unidades/route.ts`
 
 ## Contrato tecnico
 - `getScopeFilter(profile)` retorna `null` para `ADMIN_GLOBAL`.
@@ -21,11 +25,13 @@ Documentar o tenant scope real usado nas rotas operacionais da Central SILO OPS.
   - `UNIDADE_PADRAO`
 - `canAccessEmpresa()`, `canAccessUsina()` e `canAccessUnidade()` validam o item contra a sessao.
 - `isAdminGlobal()` desliga o filtro.
+- `src/lib/admin-tenant-store.ts` agora fornece o tenant master file-backed para cadastro inicial.
 
 ## Regras de seguranca
 - `ADMIN_GLOBAL` acessa tudo.
 - O filtro real para roles menores existe em rotas validas, mas nao e universal em toda a base ainda.
 - A normalizacao de defaults e uma compatibilidade legada, nao uma modelagem multi-tenant completa.
+- O cadastro mestre de empresas/usinas/unidades ainda nao e banco real; e persistido em arquivo.
 
 ## Validacao curl
 ```bash
@@ -39,9 +45,14 @@ curl -i -c cookies.txt \
 curl -i -b cookies.txt http://localhost:3000/api/eventos
 ```
 
+```bash
+curl -i -b cookies.txt http://localhost:3000/api/admin/empresas
+```
+
 ## Riscos conhecidos
 - Novas rotas podem esquecer de aplicar o scope do servidor.
 - Query string manual nao deve ser tratada como autorizacao.
+- O tenant master depende de arquivo no container e pode sumir se o volume nao for persistente.
 
 ## Status
 `parcial`

@@ -346,6 +346,31 @@ test("tenant isolation keeps ADMIN_GLOBAL broad and VIEWER constrained to defaul
   assert.doesNotMatch(JSON.stringify(scopeLike(items, viewer)), /USINA_TESTE_BLOQUEADA|UNIDADE_TESTE_BLOQUEADA/);
 });
 
+test("admin tenant routes exist and are protected with 401 and 403 guards", () => {
+  const empresasRoute = readFileSync(new URL("../src/app/api/admin/empresas/route.ts", import.meta.url), "utf8");
+  const usinasRoute = readFileSync(new URL("../src/app/api/admin/usinas/route.ts", import.meta.url), "utf8");
+  const unidadesRoute = readFileSync(new URL("../src/app/api/admin/unidades/route.ts", import.meta.url), "utf8");
+  const helpersSource = readFileSync(new URL("../src/app/api/admin/_helpers.ts", import.meta.url), "utf8");
+  const storeSource = readFileSync(new URL("../src/lib/admin-tenant-store.ts", import.meta.url), "utf8");
+
+  [empresasRoute, usinasRoute, unidadesRoute].forEach((source) => {
+    assert.match(source, /unauthorized/);
+    assert.match(source, /forbidden/);
+    assert.match(source, /GET/);
+    assert.match(source, /POST/);
+  });
+
+  assert.match(helpersSource, /canReadAdminTenant/);
+  assert.match(helpersSource, /canWriteAdminTenant/);
+  assert.match(storeSource, /TENANT_STORE_PATH/);
+  assert.match(storeSource, /upsertEmpresa/);
+  assert.match(storeSource, /upsertUsina/);
+  assert.match(storeSource, /upsertUnidade/);
+  assert.match(storeSource, /getAccessibleEmpresaIds/);
+  assert.match(storeSource, /getAccessibleUsinaIds/);
+  assert.match(storeSource, /getAccessibleUnidadeIds/);
+});
+
 test("dashboard premium exposes technical status, events and operations blocks", () => {
   const dashboardSource = readFileSync(new URL("../src/app/page.tsx", import.meta.url), "utf8");
   const typesSource = readFileSync(new URL("../src/lib/dashboard-types.ts", import.meta.url), "utf8");
