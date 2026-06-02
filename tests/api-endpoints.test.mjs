@@ -110,6 +110,14 @@ test("api/eventos route returns controlled technical empty payload", () => {
   assert.equal(existsSync(new URL("../src/app/api/eventos/route.ts", import.meta.url)), true);
 });
 
+test("/api/operacoes requires session and returns unauthorized JSON", () => {
+  const routeSource = readFileSync(new URL("../src/app/api/operacoes/route.ts", import.meta.url), "utf8");
+
+  assert.match(routeSource, /getSessionFromRequest/);
+  assert.match(routeSource, /error:\s*"unauthorized"/);
+  assert.doesNotMatch(routeSource, /message:\s*"Sessão inválida ou ausente\."|message:\s*"SessÃ£o invÃ¡lida ou ausente\."/);
+});
+
 test("recent events route exists and returns empty array when backend is unavailable", () => {
   const routeSource = readFileSync(new URL("../src/app/api/eventos/recentes/route.ts", import.meta.url), "utf8");
 
