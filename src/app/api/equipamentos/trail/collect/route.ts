@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest, isAdminGlobal } from "@/lib/auth";
-import { appendEquipmentTrailPoints, buildTrailPointFromRecord, readEquipmentTrailStore } from "@/lib/equipment-trail-store";
-
-function extractItems(payload: unknown): unknown[] {
-  return Array.isArray(payload) ? payload : [];
-}
+import { readEquipmentTrailStore } from "@/lib/equipment-trail-store";
+import { persistTrailPointsFromEquipmentStatus } from "@/lib/equipment-status-trail";
 
 export async function POST(req: NextRequest) {
   const session = getSessionFromRequest(req);
@@ -17,7 +14,8 @@ export async function POST(req: NextRequest) {
   }
 
   const before = await readEquipmentTrailStore();
-  const statusUrl = new URL("/api/equipamentos/status", req.url);
+  const origin = new URL(req.url).origin;
+  const statusUrl = `${origin}/api/equipamentos/status`;
 
   try {
     const res = await fetch(statusUrl, {
@@ -30,17 +28,11 @@ export async function POST(req: NextRequest) {
     });
 
     if (!res.ok) {
-      return NextResponse.json({ collected: 0, upstream_status: res.status }, { status: 200 });
+      return NextResponse.json({ error: "upstream_status_failed", upstream_status: res.status }, { status: 500 });
     }
 
     const data = await res.json().catch(() => []);
-    const points = extractItems(data)
-      .map((item) => buildTrailPointFromRecord((item ?? {}) as Record<string, unknown>, String((item as { trator_id?: unknown }).trator_id ?? "trail"), "collect"))
-      .filter((item): item is NonNullable<typeof item> => Boolean(item));
-
-    if (points.length > 0) {
-      await appendEquipmentTrailPoints(points);
-    }
+    const points = await persistTrailPointsFromEquipmentStatus(data);
 
     const after = await readEquipmentTrailStore();
     return NextResponse.json(
@@ -53,6 +45,6 @@ export async function POST(req: NextRequest) {
     );
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ collected: 0, error }, { status: 200 });
+    return NextResponse.json({ error: "upstream_status_failed", detail: error }, { status: 500 });
   }
 }
