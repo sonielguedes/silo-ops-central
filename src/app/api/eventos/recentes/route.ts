@@ -1,14 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { IS_DEMO, SITE_URL } from "@/lib/app-env";
 import {
-  applyScopeToUrl,
-  canAccessEmpresa,
-  canAccessUnidade,
-  canAccessUsina,
-  decodeSessionCookie,
-  SESSION_COOKIE_NAME,
-  isAdminGlobal,
-  normalizeScopeFields,
+  getSessionFromRequest,
 } from "@/lib/auth";
 
 const BASE = (process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "").trim().replace(/\/$/, "");
@@ -25,11 +18,9 @@ function normalizeEventos(payload: unknown) {
     descricao: item.descricao ?? item.status ?? item.mensagem ?? null,
     timestamp: item.timestamp ?? item.horario ?? item.created_at ?? item.createdAt ?? new Date().toISOString(),
     origem: item.origem ?? item.source ?? "API",
-    ...normalizeScopeFields({
-      empresa_id: item.empresa_id,
-      usina_id: item.usina_id,
-      unidade_id: item.unidade_id,
-    }),
+    empresa_id: item.empresa_id ?? null,
+    usina_id: item.usina_id ?? null,
+    unidade_id: item.unidade_id ?? null,
   }));
 }
 
@@ -48,12 +39,7 @@ async function fetchUpstream(url: string) {
 }
 
 export async function GET(req: NextRequest) {
-  const sessionCookie = req.cookies.get(SESSION_COOKIE_NAME)?.value;
-  if (!sessionCookie) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
-
-  const session = decodeSessionCookie(sessionCookie);
+  const session = getSessionFromRequest(req);
   if (!session) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
@@ -73,20 +59,15 @@ export async function GET(req: NextRequest) {
   }
 
   const candidates = [
-    applyScopeToUrl(`${BASE}/api/eventos${qs ? `?${qs}` : ""}`, session),
-    applyScopeToUrl(`${BASE}/api/eventos/recentes${qs ? `?${qs}` : ""}`, session),
+    `${BASE}/api/eventos${qs ? `?${qs}` : ""}`,
+    `${BASE}/api/eventos/recentes${qs ? `?${qs}` : ""}`,
   ];
 
   for (const url of candidates) {
     try {
       const { res, data } = await fetchUpstream(url);
       if (!res.ok) continue;
-      const eventos = normalizeEventos(data).filter((item) => {
-        if (isAdminGlobal(session)) return true;
-        return canAccessEmpresa(session, item.empresa_id)
-          && canAccessUsina(session, item.usina_id)
-          && canAccessUnidade(session, item.unidade_id);
-      });
+      const eventos = normalizeEventos(data);
       return NextResponse.json({ eventos, status_tecnico: "ok", upstream_status: res.status }, { status: 200 });
     } catch (err) {
       console.error("[SIL] /api/eventos/recentes upstream error", { url, err: err instanceof Error ? err.message : String(err) });

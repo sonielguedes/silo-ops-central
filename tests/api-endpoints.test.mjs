@@ -244,15 +244,14 @@ test("middleware guards internal pages and preserves returnTo while leaving api 
   assert.match(middlewareSource, /SESSION_COOKIE_NAME/);
 });
 
-test("recent events route requires session and applies tenant scope helpers", () => {
+test("recent events route requires session and uses request session helper", () => {
   const routeSource = readFileSync(new URL("../src/app/api/eventos/recentes/route.ts", import.meta.url), "utf8");
 
-  assert.match(routeSource, /SESSION_COOKIE_NAME/);
-  assert.match(routeSource, /decodeSessionCookie/);
+  assert.match(routeSource, /getSessionFromRequest/);
   assert.match(routeSource, /error:\s*"unauthorized"/);
-  assert.match(routeSource, /applyScopeToUrl/);
-  assert.match(routeSource, /normalizeScopeFields/);
-  assert.match(routeSource, /isAdminGlobal/);
+  assert.doesNotMatch(routeSource, /applyScopeToUrl/);
+  assert.doesNotMatch(routeSource, /normalizeScopeFields/);
+  assert.doesNotMatch(routeSource, /isAdminGlobal/);
 });
 
 test("soniel seeds remain ADMIN_GLOBAL", () => {
