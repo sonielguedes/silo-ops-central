@@ -84,6 +84,21 @@ test("/api/operacoes/ativas requires session and returns unauthorized JSON", () 
   assert.doesNotMatch(routeSource, /message:\s*"Sessão inválida ou ausente\."|message:\s*"SessÃ£o invÃ¡lida ou ausente\."/);
 });
 
+test("/api/equipamentos/trail/collect is admin protected and persists trail points", () => {
+  const routePath = new URL("../src/app/api/equipamentos/trail/collect/route.ts", import.meta.url);
+  const routeSource = readFileSync(routePath, "utf8");
+  const docSource = readFileSync(new URL("../docs/specs/equipment-trail-collect.md", import.meta.url), "utf8");
+
+  assert.match(routeSource, /POST/);
+  assert.match(routeSource, /getSessionFromRequest/);
+  assert.match(routeSource, /isAdminGlobal/);
+  assert.match(routeSource, /readEquipmentTrailStore/);
+  assert.match(routeSource, /appendEquipmentTrailPoints/);
+  assert.match(routeSource, /collected/);
+  assert.match(docSource, /curl -b admin\.cookie -X POST \/api\/equipamentos\/trail\/collect/);
+  assert.equal(existsSync(routePath), true);
+});
+
 test("health proxy reports degraded/down instead of throwing raw upstream failures", () => {
   const healthSource = readFileSync(new URL("../src/app/api/health/route.ts", import.meta.url), "utf8");
 
