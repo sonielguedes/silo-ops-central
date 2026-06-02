@@ -158,6 +158,7 @@ test("equipment list exposes direct trail navigation on each row", () => {
   assert.match(trailIndexSource, /Rastro dos Equipamentos/);
   assert.match(trailIndexSource, /Ver rastro/);
   assert.match(trailIndexSource, /Último sinal/);
+  assert.match(trailIndexSource, /GPS/);
 });
 
 test("operations page does not slice nullable API fields directly", () => {

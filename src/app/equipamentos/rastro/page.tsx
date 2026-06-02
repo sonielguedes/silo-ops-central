@@ -79,6 +79,7 @@ export default function EquipmentTrailIndexPage() {
                     <Field label="Presença" value={item.presence || "--"} />
                     <Field label="Estado operacional" value={item.estado_operacional || item.status || "--"} />
                     <Field label="Último sinal" value={fmtDate(item.last_seen)} />
+                    <Field label="GPS" value={item.latitude !== null && item.longitude !== null ? `${item.latitude.toFixed(6)}, ${item.longitude.toFixed(6)}` : "--"} />
                   </div>
                   <Link href={`/equipamentos/${item.trator_id}/rastro`} className="btn-primary w-full justify-center inline-flex">
                     Ver rastro
