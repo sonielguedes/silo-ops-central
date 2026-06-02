@@ -11,7 +11,7 @@ export const DEMO_AUTH = {
 };
 
 export const OFFICIAL_PROD_AUTH = {
-  emails: ["soniel2013@gmail.com", "sonieloficial@gmail.com"] as string[],
+  emails: ["soniel2013@gmail.com", "sonieloficial@gmail.com", "viewer@siloops.com.br"] as string[],
   password: "SiloOps@2026",
 } as const;
 
@@ -102,6 +102,15 @@ export const USER_SEEDS: UserSeed[] = [
     usinas: ["*"],
     unidades: ["*"],
     permissions: ["*"],
+  },
+  {
+    email: "viewer@siloops.com.br",
+    name: "Viewer Tenant",
+    role: "VIEWER",
+    empresa_id: "SILOOPS",
+    usinas: ["USINA_PADRAO"],
+    unidades: ["UNIDADE_PADRAO"],
+    permissions: ["read:dashboard", "read:eventos", "read:operacoes", "read:equipamentos"],
   },
 ];
 

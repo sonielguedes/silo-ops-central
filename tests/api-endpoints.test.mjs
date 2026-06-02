@@ -288,6 +288,19 @@ test("soniel seeds remain ADMIN_GLOBAL", () => {
   assert.doesNotMatch(source, /role:\s*"admin"/);
 });
 
+test("viewer seed exists with tenant scope and read-only permissions", () => {
+  const source = readFileSync(new URL("../src/lib/auth.ts", import.meta.url), "utf8");
+
+  assert.match(source, /viewer@siloops\.com\.br[\s\S]*role:\s*"VIEWER"/);
+  assert.match(source, /viewer@siloops\.com\.br[\s\S]*usinas:\s*\["USINA_PADRAO"\]/);
+  assert.match(source, /viewer@siloops\.com\.br[\s\S]*unidades:\s*\["UNIDADE_PADRAO"\]/);
+  assert.match(source, /viewer@siloops\.com\.br[\s\S]*read:dashboard/);
+  assert.match(source, /viewer@siloops\.com\.br[\s\S]*read:eventos/);
+  assert.match(source, /viewer@siloops\.com\.br[\s\S]*read:operacoes/);
+  assert.match(source, /viewer@siloops\.com\.br[\s\S]*read:equipamentos/);
+  assert.match(source, /viewer@siloops\.com\.br/);
+});
+
 test("dashboard premium exposes technical status, events and operations blocks", () => {
   const dashboardSource = readFileSync(new URL("../src/app/page.tsx", import.meta.url), "utf8");
   const typesSource = readFileSync(new URL("../src/lib/dashboard-types.ts", import.meta.url), "utf8");
