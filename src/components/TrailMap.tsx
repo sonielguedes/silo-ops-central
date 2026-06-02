@@ -69,9 +69,6 @@ export default function TrailMap({ points, title = "Trajeto", emptyMessage }: Tr
       lineJoin: "round",
     }).addTo(layer);
 
-    const start = coords[0];
-    const end = coords[coords.length - 1];
-
     const createDot = (color: string, size: number) =>
       L.divIcon({
         className: "",
@@ -80,14 +77,16 @@ export default function TrailMap({ points, title = "Trajeto", emptyMessage }: Tr
         iconAnchor: [size / 2, size / 2],
       });
 
-    L.marker(start, { icon: createDot("#4a6a8a", 12) }).addTo(layer).bindTooltip("Primeira posição", { direction: "top" });
-    L.marker(end, { icon: createDot("#00d4ff", 16) }).addTo(layer).bindTooltip("Última posição", { direction: "top" });
-
-    if (coords.length > 1) {
+    if (coords.length === 1) {
+      L.marker(coords[0], { icon: createDot("#00d4ff", 16) }).addTo(layer).bindTooltip("Posição atual", { direction: "top" });
+      map.setView(coords[0], 18);
+    } else {
+      const start = coords[0];
+      const end = coords[coords.length - 1];
+      L.marker(start, { icon: createDot("#4a6a8a", 12) }).addTo(layer).bindTooltip("Primeira posição", { direction: "top" });
+      L.marker(end, { icon: createDot("#00d4ff", 16) }).addTo(layer).bindTooltip("Última posição", { direction: "top" });
       const bounds = polyline.getBounds();
       map.fitBounds(bounds, { padding: [48, 48], maxZoom: 18 });
-    } else {
-      map.setView(coords[0], 18);
     }
   }, [points]);
 
