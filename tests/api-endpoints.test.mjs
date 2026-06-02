@@ -216,6 +216,11 @@ test("demo login credentials are centralized and gated by demo environment", () 
   assert.match(authSource, /canUseProdLogin/);
   assert.match(authSource, /SESSION_COOKIE_NAME/);
   assert.match(authSource, /OFFICIAL_PROD_AUTH/);
+  assert.match(authSource, /isAdminGlobal/);
+  assert.match(authSource, /canAccessModule/);
+  assert.match(authSource, /getSessionFromRequest/);
+  assert.match(authSource, /getScopeFilter/);
+  assert.match(authSource, /normalizeScopeFields/);
   assert.match(loginContext, /fetch\("\/api\/auth\/login"/);
   assert.match(loginContext, /fetch\("\/api\/auth\/logout"/);
   assert.match(loginContext, /mirrorSession/);
@@ -226,6 +231,7 @@ test("demo login credentials are centralized and gated by demo environment", () 
   assert.match(loginRoute, /returnTo/);
   assert.match(loginRoute, /profile:/);
   assert.match(logoutRoute, /SESSION_COOKIE_NAME/);
+  assert.doesNotMatch(authSource, /role:\s*"admin"/);
 });
 
 test("middleware guards internal pages and preserves returnTo while leaving api routes public", () => {
@@ -236,6 +242,24 @@ test("middleware guards internal pages and preserves returnTo while leaving api 
   assert.match(middlewareSource, /returnTo/);
   assert.match(middlewareSource, /decodeSessionCookie/);
   assert.match(middlewareSource, /SESSION_COOKIE_NAME/);
+});
+
+test("recent events route requires session and applies tenant scope helpers", () => {
+  const routeSource = readFileSync(new URL("../src/app/api/eventos/recentes/route.ts", import.meta.url), "utf8");
+
+  assert.match(routeSource, /SESSION_COOKIE_NAME/);
+  assert.match(routeSource, /decodeSessionCookie/);
+  assert.match(routeSource, /error:\s*"unauthorized"/);
+  assert.match(routeSource, /applyScopeToUrl/);
+  assert.match(routeSource, /normalizeScopeFields/);
+  assert.match(routeSource, /isAdminGlobal/);
+});
+
+test("soniel seeds remain ADMIN_GLOBAL", () => {
+  const source = readFileSync(new URL("../src/lib/auth.ts", import.meta.url), "utf8");
+  assert.match(source, /sonieloficial@gmail\.com[\s\S]*role:\s*"ADMIN_GLOBAL"/);
+  assert.match(source, /soniel2013@gmail\.com[\s\S]*role:\s*"ADMIN_GLOBAL"/);
+  assert.doesNotMatch(source, /role:\s*"admin"/);
 });
 
 test("dashboard premium exposes technical status, events and operations blocks", () => {
