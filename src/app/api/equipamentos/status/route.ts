@@ -2,10 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { IS_DEMO, SITE_URL } from "@/lib/app-env";
 import { normalizeEquipmentList } from "@/lib/api";
 import { filterItemsBySessionScope, getSessionFromRequest, normalizeScopeFields } from "@/lib/auth";
-import { persistTrailPointsFromEquipmentStatus } from "@/lib/equipment-status-trail";
+import { fetchEquipmentStatusSnapshot, persistTrailPointsFromEquipmentStatus } from "@/lib/equipment-status-trail";
 
 const B = (process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000").trim().replace(/\/$/, "");
-const ENDPOINT = "/api/equipamentos/status";
 
 export async function GET(req: NextRequest) {
   const session = getSessionFromRequest(req);
@@ -17,20 +16,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json([], { status: 200 });
   }
 
-  const url = `${B}${ENDPOINT}`;
-
   try {
-    const r = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(8000) });
-    const text = await r.text();
-    const data = text ? JSON.parse(text) : null;
-
-    if (!r.ok) {
-      console.error("[SIL] endpoint failed", { endpoint: ENDPOINT, status: r.status, url });
-      return NextResponse.json([], { status: 200 });
-    }
-
+    const { data } = await fetchEquipmentStatusSnapshot();
     await persistTrailPointsFromEquipmentStatus(data);
-
     const items = filterItemsBySessionScope(normalizeEquipmentList(data).map((item) => ({
       ...item,
       ...normalizeScopeFields({
@@ -43,7 +31,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(items, { status: 200 });
   } catch (e) {
     const error = e instanceof Error ? e.message : String(e);
-    console.error("[SIL] endpoint failed", { endpoint: ENDPOINT, status: null, url, error });
+    console.error("[SIL] endpoint failed", { endpoint: "/api/equipamentos/status", status: null, error });
     return NextResponse.json([], { status: 200 });
   }
 }

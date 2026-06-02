@@ -20,7 +20,7 @@ Coletar pontos GPS a partir de `/api/equipamentos/status` e persistir no histór
 ## Segurança
 - Sem cookie: `401 { "error": "unauthorized" }`
 - Não admin: `403 { "error": "forbidden" }`
-- Erro de upstream: `500 { "error": "upstream_status_failed" }`
+- Erro de upstream: `500 { "error": "collector_failed", "message": "..." }`
 - Sem dependência de navegador aberto
 - Dedupe ativo no store
 
