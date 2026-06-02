@@ -92,12 +92,17 @@ test("/api/equipamentos/trail/collect is admin protected and persists trail poin
   assert.match(routeSource, /POST/);
   assert.match(routeSource, /getSessionFromRequest/);
   assert.match(routeSource, /isAdminGlobal/);
+  assert.match(routeSource, /x-collector-token/);
+  assert.match(routeSource, /COLLECTOR_TOKEN/);
   assert.match(routeSource, /fetchEquipmentStatusSnapshot/);
   assert.match(routeSource, /persistTrailPointsFromEquipmentStatus/);
   assert.match(routeSource, /readEquipmentTrailStore/);
   assert.match(routeSource, /collected/);
   assert.match(routeSource, /collector_failed/);
+  assert.match(routeSource, /401/);
+  assert.match(routeSource, /403/);
   assert.match(routeSource, /500/);
+  assert.match(docSource, /x-collector-token/);
   assert.match(docSource, /curl -b admin\.cookie -X POST \/api\/equipamentos\/trail\/collect/);
   assert.equal(existsSync(routePath), true);
 });

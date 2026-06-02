@@ -4,13 +4,22 @@ import { readEquipmentTrailStore } from "@/lib/equipment-trail-store";
 import { fetchEquipmentStatusSnapshot, persistTrailPointsFromEquipmentStatus } from "@/lib/equipment-status-trail";
 
 export async function POST(req: NextRequest) {
-  const session = getSessionFromRequest(req);
-  if (!session) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
+  const hasCollectorToken = req.headers.has("x-collector-token");
+  if (hasCollectorToken) {
+    const collectorToken = req.headers.get("x-collector-token") || "";
+    const expectedToken = (process.env.COLLECTOR_TOKEN || "").trim();
+    if (!expectedToken || collectorToken !== expectedToken) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+  } else {
+    const session = getSessionFromRequest(req);
+    if (!session) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
 
-  if (!isAdminGlobal(session)) {
-    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    if (!isAdminGlobal(session)) {
+      return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    }
   }
 
   const before = await readEquipmentTrailStore();

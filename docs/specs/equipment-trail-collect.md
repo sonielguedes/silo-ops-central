@@ -12,6 +12,7 @@ Coletar pontos GPS a partir de `/api/equipamentos/status` e persistir no histór
 - `POST /api/equipamentos/trail/collect`
 - Requer cookie `sil_session`
 - Requer `ADMIN_GLOBAL`
+- Suporta `x-collector-token` com `COLLECTOR_TOKEN`
 - Busca o status internamente
 - Persiste os pontos válidos no store JSON
 - Responde com a quantidade coletada
@@ -20,6 +21,7 @@ Coletar pontos GPS a partir de `/api/equipamentos/status` e persistir no histór
 ## Segurança
 - Sem cookie: `401 { "error": "unauthorized" }`
 - Não admin: `403 { "error": "forbidden" }`
+- Token inválido: `401 { "error": "unauthorized" }`
 - Erro de upstream: `500 { "error": "collector_failed", "message": "..." }`
 - Sem dependência de navegador aberto
 - Dedupe ativo no store
@@ -27,6 +29,10 @@ Coletar pontos GPS a partir de `/api/equipamentos/status` e persistir no histór
 ## Uso
 ```bash
 curl -b admin.cookie -X POST /api/equipamentos/trail/collect
+```
+
+```bash
+curl -X POST /api/equipamentos/trail/collect -H "x-collector-token: $COLLECTOR_TOKEN"
 ```
 
 ## Status
