@@ -1,12 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { useParams, useRouter } from "next/navigation";
 import Header from "@/components/Header";
 import Badge from "@/components/Badge";
 import ApiErr from "@/components/ApiErr";
-import Empty from "@/components/Empty";
-import TrailMap from "@/components/TrailMap";
 import { api, fmtDate, timeAgo, type GpsPoint } from "@/lib/api";
 
 type TrailPoint = GpsPoint & {
@@ -18,6 +17,8 @@ type TrailPoint = GpsPoint & {
 };
 
 type PeriodPreset = "6h" | "24h" | "72h" | "7d" | "all" | "custom";
+
+const TrailMapClient = dynamic(() => import("@/components/TrailMap"), { ssr: false });
 
 function haversineKm(a: TrailPoint, b: TrailPoint) {
   const R = 6371;
@@ -100,15 +101,18 @@ export default function EquipamentoRastroPage() {
   }, [points, preset, customFrom, customTo]);
 
   const stats = useMemo(() => {
-    const first = filteredPoints[0] || null;
-    const last = filteredPoints[filteredPoints.length - 1] || null;
-    const km = filteredPoints.reduce((total, point, index) => {
+    const first = filteredPoints.length > 0 ? filteredPoints[0] : null;
+    const last = filteredPoints.length > 0 ? filteredPoints[filteredPoints.length - 1] : null;
+    const km = filteredPoints.length > 1 ? filteredPoints.reduce((total, point, index) => {
       if (index === 0) return total;
       return total + haversineKm(filteredPoints[index - 1], point);
-    }, 0);
+    }, 0) : null;
     const duration = first && last ? new Date(last.timestamp).getTime() - new Date(first.timestamp).getTime() : 0;
-    return { first, last, km, duration };
+    return { first, last, km, duration: first && last ? duration : null };
   }, [filteredPoints]);
+
+  const lastPoint = filteredPoints.length > 0 ? filteredPoints[filteredPoints.length - 1] : null;
+  const hasPoints = filteredPoints.length > 0;
 
   return (
     <div className="flex-1 flex flex-col min-h-screen">
@@ -117,16 +121,16 @@ export default function EquipamentoRastroPage() {
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-3">
             <button onClick={() => router.push("/equipamentos")} className="btn-ghost">← Voltar para Equipamentos</button>
-            <Badge label={points.length ? `${points.length} pontos` : "Sem dados"} variant={points.length ? "info" : "offline"} />
+            <Badge label={hasPoints ? `${filteredPoints.length} pontos` : "Sem dados"} variant={hasPoints ? "info" : "offline"} />
           </div>
-          <div className="text-[#4a6a8a] text-xs font-mono">Atualizado: {points.length ? timeAgo(points[points.length - 1].timestamp) : "--"}</div>
+          <div className="text-[#4a6a8a] text-xs font-mono">Atualizado: {lastPoint ? timeAgo(lastPoint.timestamp) : "--"}</div>
         </div>
 
         {error && <ApiErr label="/api/equipamentos/[tratorId]/rastro" msg={error} />}
 
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-          <div className="card-p"><p className="text-[#4a6a8a] text-[10px] uppercase font-semibold tracking-wider">Km estimado</p><p className="text-[#00d4ff] text-2xl font-bold font-mono mt-1">{stats.km.toFixed(2)}</p></div>
-          <div className="card-p"><p className="text-[#4a6a8a] text-[10px] uppercase font-semibold tracking-wider">Tempo total</p><p className="text-[#c8d8e8] text-2xl font-bold font-mono mt-1">{durationLabel(stats.duration)}</p></div>
+          <div className="card-p"><p className="text-[#4a6a8a] text-[10px] uppercase font-semibold tracking-wider">Km estimado</p><p className="text-[#00d4ff] text-2xl font-bold font-mono mt-1">{stats.km === null ? "--" : stats.km.toFixed(2)}</p></div>
+          <div className="card-p"><p className="text-[#4a6a8a] text-[10px] uppercase font-semibold tracking-wider">Tempo total</p><p className="text-[#c8d8e8] text-2xl font-bold font-mono mt-1">{stats.duration === null ? "--" : durationLabel(stats.duration)}</p></div>
           <div className="card-p"><p className="text-[#4a6a8a] text-[10px] uppercase font-semibold tracking-wider">Primeira posição</p><p className="text-[#c8d8e8] text-sm font-mono mt-1">{stats.first ? fmtDate(stats.first.timestamp) : "--"}</p></div>
           <div className="card-p"><p className="text-[#4a6a8a] text-[10px] uppercase font-semibold tracking-wider">Última posição</p><p className="text-[#c8d8e8] text-sm font-mono mt-1">{stats.last ? fmtDate(stats.last.timestamp) : "--"}</p></div>
         </div>
@@ -161,30 +165,39 @@ export default function EquipamentoRastroPage() {
             <div className="xl:col-span-2 card-p h-[520px] animate-pulse" />
             <div className="card-p h-[520px] animate-pulse" />
           </div>
-        ) : filteredPoints.length === 0 ? (
-          <Empty title="Nenhum ponto no período" sub="Ajuste o filtro temporal ou aguarde novos dados do equipamento." icon="🛰️" />
         ) : (
           <div className="grid xl:grid-cols-3 gap-4">
             <div className="xl:col-span-2">
-              <TrailMap points={filteredPoints} title={`Trajeto ${tratorId}`} />
+              <TrailMapClient
+                points={filteredPoints}
+                title={`Trajeto ${tratorId}`}
+                emptyMessage="Nenhum ponto de rastro encontrado para este equipamento no período."
+              />
             </div>
             <div className="card-p space-y-3 max-h-[520px] overflow-auto">
               <h3 className="text-white font-black">Pontos GPS</h3>
-              <div className="space-y-2">
-                {filteredPoints.map((point, index) => (
-                  <div key={`${point.timestamp}-${index}`} className="rounded-xl border border-[#1f334d] bg-[#0d1420] p-3 space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-[#00d4ff] text-xs font-mono font-black">{fmtDate(point.timestamp)}</span>
-                      <Badge label={point.status || "GPS"} variant={point.status?.toUpperCase().includes("OFF") ? "offline" : point.status?.toUpperCase().includes("INST") ? "instavel" : "info"} dot={false} />
+              {filteredPoints.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-[#1f334d] bg-[#0d1420] p-6 text-center">
+                  <p className="text-white font-black text-sm uppercase tracking-widest">Nenhum ponto de rastro encontrado para este equipamento no período.</p>
+                  <p className="mt-2 text-[#4a6a8a] text-xs">Ajuste o filtro temporal ou aguarde novos dados do equipamento.</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {filteredPoints.map((point, index) => (
+                    <div key={`${point.timestamp}-${index}`} className="rounded-xl border border-[#1f334d] bg-[#0d1420] p-3 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[#00d4ff] text-xs font-mono font-black">{fmtDate(point.timestamp)}</span>
+                        <Badge label={point.status || "GPS"} variant={point.status?.toUpperCase().includes("OFF") ? "offline" : point.status?.toUpperCase().includes("INST") ? "instavel" : "info"} dot={false} />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div><span className="text-[#4a6a8a]">Velocidade</span><div className="text-[#c8d8e8] font-mono">{point.velocidade ?? "--"}</div></div>
+                        <div><span className="text-[#4a6a8a]">Origem</span><div className="text-[#c8d8e8] font-mono">{point.origem || "--"}</div></div>
+                        <div className="col-span-2"><span className="text-[#4a6a8a]">Coordenadas</span><div className="text-[#c8d8e8] font-mono">{point.latitude.toFixed(6)}, {point.longitude.toFixed(6)}</div></div>
+                      </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div><span className="text-[#4a6a8a]">Velocidade</span><div className="text-[#c8d8e8] font-mono">{point.velocidade ?? "--"}</div></div>
-                      <div><span className="text-[#4a6a8a]">Origem</span><div className="text-[#c8d8e8] font-mono">{point.origem || "--"}</div></div>
-                      <div className="col-span-2"><span className="text-[#4a6a8a]">Coordenadas</span><div className="text-[#c8d8e8] font-mono">{point.latitude.toFixed(6)}, {point.longitude.toFixed(6)}</div></div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}

@@ -48,6 +48,20 @@ test("equipment trail page and proxy route exist with cookie guard and tenant-sa
   assert.equal(existsSync(new URL("../src/app/equipamentos/[tratorId]/rastro/page.tsx", import.meta.url)), true);
 });
 
+test("equipment trail page handles empty API payload without indexing points", () => {
+  const pageSource = readFileSync(new URL("../src/app/equipamentos/[tratorId]/rastro/page.tsx", import.meta.url), "utf8");
+  const trailMapSource = readFileSync(new URL("../src/components/TrailMap.tsx", import.meta.url), "utf8");
+
+  assert.match(pageSource, /Nenhum ponto de rastro encontrado para este equipamento no período\./);
+  assert.match(pageSource, /stats\.km === null/);
+  assert.match(pageSource, /stats\.duration === null/);
+  assert.match(pageSource, /filteredPoints\.length === 0/);
+  assert.match(pageSource, /emptyMessage=/);
+  assert.match(pageSource, /dynamic\(\(\) => import\("@\/components\/TrailMap"\), \{ ssr: false \}\)/);
+  assert.match(trailMapSource, /points\.length === 0/);
+  assert.match(trailMapSource, /emptyMessage/);
+});
+
 test("/api/equipamentos/status requires session and returns unauthorized JSON", () => {
   const routeSource = readFileSync(new URL("../src/app/api/equipamentos/status/route.ts", import.meta.url), "utf8");
 

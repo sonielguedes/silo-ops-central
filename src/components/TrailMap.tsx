@@ -8,9 +8,10 @@ import type { GpsPoint } from "@/lib/api";
 type TrailMapProps = {
   points: GpsPoint[];
   title?: string;
+  emptyMessage?: string;
 };
 
-export default function TrailMap({ points, title = "Trajeto" }: TrailMapProps) {
+export default function TrailMap({ points, title = "Trajeto", emptyMessage }: TrailMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const tileRef = useRef<L.TileLayer | null>(null);
@@ -97,6 +98,14 @@ export default function TrailMap({ points, title = "Trajeto" }: TrailMapProps) {
         .leaflet-control-attribution { background: rgba(5,10,15,0.75) !important; color: #4a6a8a !important; }
       ` }} />
       <div ref={containerRef} className="absolute inset-0" aria-label={title} />
+      {points.length === 0 && (
+        <div className="absolute inset-0 z-[2] flex items-center justify-center pointer-events-none bg-[linear-gradient(180deg,rgba(9,14,20,0.20),rgba(9,14,20,0.72))]">
+          <div className="max-w-sm rounded-2xl border border-[#1f334d] bg-[#0d1420]/90 px-5 py-4 text-center shadow-2xl">
+            <p className="text-white font-black text-sm uppercase tracking-widest">Sem pontos de rastro</p>
+            <p className="mt-2 text-[#7f9bb8] text-xs leading-relaxed">{emptyMessage || "Nenhum ponto disponível para este período."}</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
