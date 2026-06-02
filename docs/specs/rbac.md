@@ -1,7 +1,7 @@
 # RBAC
 
 ## Objetivo
-Documentar o modelo de autorização por papel e por módulo atualmente implementado na Central SILO OPS.
+Documentar o modelo real de papeis e permissao usado pela Central SILO OPS.
 
 ## Arquivos envolvidos
 - `src/lib/auth.ts`
@@ -12,21 +12,22 @@ Documentar o modelo de autorização por papel e por módulo atualmente implemen
 - `src/app/api/operacoes/route.ts`
 - `src/app/api/operacoes/ativas/route.ts`
 
-## Contrato técnico
+## Contrato tecnico
 - `Role` inclui `ADMIN_GLOBAL`, `ADMIN_EMPRESA`, `GESTOR_USINA`, `GESTOR_UNIDADE`, `COA`, `VIEWER` e `OPERADOR_APK`.
-- `USER_SEEDS` define os dois usuários oficiais com `role: "ADMIN_GLOBAL"`.
-- `isAdminGlobal()` faz bypass do RBAC para `ADMIN_GLOBAL`.
-- `canAccessModule()` avalia permissão por módulo.
-- `getScopeFilter()` retorna `null` para `ADMIN_GLOBAL`; para os demais, retorna `empresa_id`, `usina_ids` e `unidade_ids`.
-- `normalizeRole()` converte aliases legados (`admin`, `ADMIN`) para `ADMIN_GLOBAL`.
+- `USER_SEEDS` define os usuarios oficiais com `role: "ADMIN_GLOBAL"`.
+- `isAdminGlobal()` faz bypass total do RBAC.
+- `canAccessModule()` avalia acesso por modulo.
+- `getScopeFilter()` retorna `null` para `ADMIN_GLOBAL` e retorna `empresa_id`, `usina_ids` e `unidade_ids` para os demais perfis.
+- `SessionPayload` inclui `email`, `name`, `role`, `empresa_id`, `usinas`, `unidades`, `permissions`, `expiry` e `mode`.
+- `normalizeRole()` converte aliases legados para `ADMIN_GLOBAL`.
 
-## Regras de segurança
-- A saída da autenticação não deve usar `admin` minúsculo.
-- O bypass administrativo existe apenas para `ADMIN_GLOBAL`.
-- Usuários fora de `ADMIN_GLOBAL` dependem de scope e filtros de item.
-- O RBAC é aplicado em rotas que leem dados operacionais; ele não é uma política global automática em todas as rotas.
+## Regras de seguranca
+- `ADMIN_GLOBAL` e o unico bypass completo.
+- Nao existe saida de autenticacao com `admin` minusculo.
+- Perfis menores dependem de scope e filtros de item nas rotas que ja aplicam esse padrao.
+- Roles futuras ainda nao estao implementadas como politica de acesso real; devem ser tratadas como pendentes ate haver codigo.
 
-## Exemplos de curl
+## Validacao curl
 ```bash
 curl -i -c cookies.txt \
   -X POST http://localhost:3000/api/auth/login \
@@ -38,5 +39,9 @@ curl -i -c cookies.txt \
 curl -i -b cookies.txt http://localhost:3000/api/eventos/recentes
 ```
 
+## Riscos conhecidos
+- Se um novo papel entrar sem update em `ROLE_MODULE_ACCESS`, o comportamento vira `VIEWER`/fallback funcional.
+- O RBAC nao e uma camada unica e global; parte da autorizacao ainda esta distribuida nas rotas.
+
 ## Status
-`implementado`
+`parcial`

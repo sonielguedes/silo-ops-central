@@ -1,7 +1,7 @@
 # API Eventos
 
 ## Objetivo
-Documentar o contrato real das rotas de eventos operacionais: `/api/eventos` e `/api/eventos/recentes`.
+Documentar o comportamento real de `/api/eventos` e `/api/eventos/recentes`.
 
 ## Arquivos envolvidos
 - `src/app/api/eventos/route.ts`
@@ -9,29 +9,19 @@ Documentar o contrato real das rotas de eventos operacionais: `/api/eventos` e `
 - `src/lib/auth.ts`
 - `tests/api-endpoints.test.mjs`
 
-## Contrato técnico
-- `GET /api/eventos`
-  - exige `sil_session`
-  - sem cookie válido retorna `401` JSON `{ "error": "unauthorized" }`
-  - com sessão válida chama o backend upstream em `/api/eventos`
-  - em `ADMIN_GLOBAL`, não aplica filtro de tenant
-  - em outros perfis, filtra por `empresa_id`, `usina_id` e `unidade_id`
-  - resposta de sucesso mantém `{ eventos, status_tecnico: "ok", upstream_status }`
-  - fallback técnico usa `status_tecnico`, `upstream_status` e `reason`
+## Contrato tecnico
+- Ambas as rotas exigem `sil_session`.
+- Sem cookie valido, respondem `401` JSON `{ "error": "unauthorized" }`.
+- Com cookie valido, mantem o contrato atual de resposta.
+- `ADMIN_GLOBAL` ve tudo; roles menores passam por filtro de tenant.
+- `GET /api/eventos` chama o upstream em `/api/eventos`.
+- `GET /api/eventos/recentes` tenta upstream em `/api/eventos` e `/api/eventos/recentes`.
+- Os payloads sao normalizados e os campos de tenant recebem defaults legados quando faltam:
+  - `empresa_id = "SILOOPS"`
+  - `usina_id = "USINA_PADRAO"`
+  - `unidade_id = "UNIDADE_PADRAO"`
 
-- `GET /api/eventos/recentes`
-  - exige `sil_session`
-  - sem cookie válido retorna `401` JSON `{ "error": "unauthorized" }`
-  - com sessão válida tenta upstream em `/api/eventos` e `/api/eventos/recentes`
-  - resposta de sucesso mantém `{ eventos, status_tecnico, upstream_status }`
-
-## Regras de segurança
-- Nenhuma das duas rotas pode redirecionar HTML.
-- A ausência de cookie é tratada como negação explícita, não como fallback silencioso.
-- `ADMIN_GLOBAL` vê tudo; demais perfis passam por filtro de tenant.
-- Eventos upstream são normalizados antes da resposta.
-
-## Exemplos de curl
+## Validacao curl
 ```bash
 curl -i http://localhost:3000/api/eventos
 ```
@@ -47,6 +37,10 @@ curl -i -c cookies.txt \
 curl -i -b cookies.txt http://localhost:3000/api/eventos
 curl -i -b cookies.txt http://localhost:3000/api/eventos/recentes
 ```
+
+## Riscos conhecidos
+- Se o upstream falhar, a rota pode retornar payload tecnico vazio em vez de dados reais.
+- A normalizacao de tenant existe para compatibilidade legada, nao para modelar multi-tenant completo.
 
 ## Status
 `implementado`

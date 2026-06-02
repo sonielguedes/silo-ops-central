@@ -1,7 +1,7 @@
 # Tenant Scope
 
 ## Objetivo
-Explicar o modelo de tenant scope usado para limitar leitura de dados operacionais por empresa, usina e unidade.
+Documentar o tenant scope real usado nas rotas operacionais da Central SILO OPS.
 
 ## Arquivos envolvidos
 - `src/lib/auth.ts`
@@ -11,27 +11,23 @@ Explicar o modelo de tenant scope usado para limitar leitura de dados operaciona
 - `src/app/api/operacoes/route.ts`
 - `src/app/api/operacoes/ativas/route.ts`
 
-## Contrato técnico
-- `getScopeFilter(profile)`:
-  - retorna `null` para `ADMIN_GLOBAL`
-  - retorna `{ empresa_id, usina_ids, unidade_ids }` para os demais perfis
-- `applyScopeToUrl(url, profile)`:
-  - adiciona `empresa_id`, `usina_id` e `unidade_id` na URL upstream
-  - usa parâmetros repetidos para listas
-- `normalizeScopeFields()`:
-  - preenche `empresa_id`, `usina_id` e `unidade_id` com defaults técnicos quando faltam
-- `canAccessEmpresa()`, `canAccessUsina()`, `canAccessUnidade()`:
-  - validam se um item pertence ao tenant da sessão
-- `isAdminGlobal()`:
-  - desabilita o filtro para `ADMIN_GLOBAL`
+## Contrato tecnico
+- `getScopeFilter(profile)` retorna `null` para `ADMIN_GLOBAL`.
+- Para perfis menores, retorna `empresa_id`, `usina_ids` e `unidade_ids`.
+- `applyScopeToUrl(url, profile)` injeta `empresa_id`, `usina_id` e `unidade_id` na URL upstream.
+- `normalizeScopeFields()` aplica defaults legados quando o payload vem sem escopo:
+  - `SILOOPS`
+  - `USINA_PADRAO`
+  - `UNIDADE_PADRAO`
+- `canAccessEmpresa()`, `canAccessUsina()` e `canAccessUnidade()` validam o item contra a sessao.
+- `isAdminGlobal()` desliga o filtro.
 
-## Regras de segurança
-- O tenant scope é aplicado no servidor, não no cliente.
-- `ADMIN_GLOBAL` é o único bypass completo.
-- Perfis não-admin não podem ultrapassar tenant via query string manual.
-- Defaults técnicos evitam `undefined` em payloads normalizados.
+## Regras de seguranca
+- `ADMIN_GLOBAL` acessa tudo.
+- O filtro real para roles menores existe em rotas validas, mas nao e universal em toda a base ainda.
+- A normalizacao de defaults e uma compatibilidade legada, nao uma modelagem multi-tenant completa.
 
-## Exemplos de curl
+## Validacao curl
 ```bash
 curl -i -c cookies.txt \
   -X POST http://localhost:3000/api/auth/login \
@@ -43,5 +39,9 @@ curl -i -c cookies.txt \
 curl -i -b cookies.txt http://localhost:3000/api/eventos
 ```
 
+## Riscos conhecidos
+- Novas rotas podem esquecer de aplicar o scope do servidor.
+- Query string manual nao deve ser tratada como autorizacao.
+
 ## Status
-`implementado`
+`parcial`
