@@ -1,22 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { IS_DEMO, SITE_URL } from "@/lib/app-env";
-import { normalizeEquipment, normalizeEquipmentList, resolveEquipmentCoordinates } from "@/lib/api";
-import { filterItemsBySessionScope, getScopeFilter, getSessionFromRequest, isAdminGlobal, normalizeScopeFields } from "@/lib/auth";
+import { normalizeEquipmentList } from "@/lib/api";
+import { filterItemsBySessionScope, getScopeFilter, getSessionFromRequest, isAdminGlobal } from "@/lib/auth";
+import { appendEquipmentTrailPoints, buildTrailPointFromRecord, queryEquipmentTrailPoints } from "@/lib/equipment-trail-store";
 
 const BASE = (process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000").trim().replace(/\/$/, "");
-
-type TrailPoint = {
-  trator_id: string;
-  timestamp: string;
-  latitude: number;
-  longitude: number;
-  velocidade: number | null;
-  status: string | null;
-  origem: string | null;
-  empresa_id: string;
-  usina_id: string;
-  unidade_id: string;
-};
+type TrailPoint = NonNullable<ReturnType<typeof buildTrailPointFromRecord>>;
 
 function parseDateMs(value: unknown): number | null {
   if (value === null || value === undefined || value === "") return null;
@@ -41,92 +30,15 @@ function extractItems(payload: unknown): unknown[] {
   return [];
 }
 
-function toFiniteNumber(value: unknown): number | null {
-  if (value === null || value === undefined || value === "") return null;
-  const num = typeof value === "number" ? value : Number(value);
-  return Number.isFinite(num) ? num : null;
-}
-
-function scopeField(value: unknown): string | undefined {
-  return typeof value === "string" && value.trim() ? value.trim() : undefined;
-}
-
-function normalizeTrailPoint(item: Record<string, unknown>, fallbackTratorId: string, source: string): TrailPoint | null {
-  const coords = resolveEquipmentCoordinates(item);
-  if (!coords.hasCoordinates || coords.latitude === null || coords.longitude === null) return null;
-
-  const timestampMs = parseDateMs(
-    item.timestamp ??
-    item.horario ??
-    item.created_at ??
-    item.createdAt ??
-    item.data_hora ??
-    item.last_seen ??
-    item.updated_at,
-  );
-  if (timestampMs === null) return null;
-
-  const scope = normalizeScopeFields({
-    empresa_id: scopeField(item.empresa_id),
-    usina_id: scopeField(item.usina_id),
-    unidade_id: scopeField(item.unidade_id),
-  });
-
-  return {
-    trator_id: String(item.trator_id ?? item.equipamento_id ?? item.id ?? fallbackTratorId),
-    timestamp: new Date(timestampMs).toISOString(),
-    latitude: coords.latitude,
-    longitude: coords.longitude,
-    velocidade: toFiniteNumber(item.velocidade ?? item.speed ?? item.velocidade_kmh ?? item.velocity),
-    status: typeof item.status === "string"
-      ? item.status
-      : typeof item.estado === "string"
-        ? item.estado
-        : typeof item.evento === "string"
-          ? item.evento
-          : null,
-    origem: typeof item.origem === "string"
-      ? item.origem
-      : typeof item.source === "string"
-        ? item.source
-        : source,
-    ...scope,
-  };
-}
-
-function normalizeStatusSnapshot(item: Record<string, unknown>, fallbackTratorId: string): TrailPoint | null {
-  const normalized = normalizeEquipment(item);
-  if (!normalized.has_coordinates || normalized.latitude === null || normalized.longitude === null) return null;
-  const timestampMs = parseDateMs(normalized.last_seen);
-  if (timestampMs === null) return null;
-
-  const scope = normalizeScopeFields({
-    empresa_id: scopeField(item.empresa_id),
-    usina_id: scopeField(item.usina_id),
-    unidade_id: scopeField(item.unidade_id),
-  });
-
-  return {
-    trator_id: normalized.trator_id || fallbackTratorId,
-    timestamp: new Date(timestampMs).toISOString(),
-    latitude: normalized.latitude,
-    longitude: normalized.longitude,
-    velocidade: normalized.velocidade,
-    status: normalized.status || normalized.presence || null,
-    origem: "status",
-    ...scope,
-  };
-}
-
 function normalizeTrailPoints(payload: unknown, fallbackTratorId: string, source: string) {
   return extractItems(payload)
-    .map((item) => normalizeTrailPoint((item ?? {}) as Record<string, unknown>, fallbackTratorId, source))
+    .map((item) => buildTrailPointFromRecord((item ?? {}) as Record<string, unknown>, fallbackTratorId, source))
     .filter((item): item is TrailPoint => Boolean(item));
 }
 
 function normalizeStatusPoints(payload: unknown, fallbackTratorId: string) {
   return normalizeEquipmentList(payload)
-    .map((item) => normalizeStatusSnapshot(item as unknown as Record<string, unknown>, fallbackTratorId))
+    .map((item) => buildTrailPointFromRecord(item as unknown as Record<string, unknown>, fallbackTratorId, "status"))
     .filter((item): item is TrailPoint => Boolean(item));
 }
 
@@ -189,6 +101,11 @@ export async function GET(
     }
 
     const scope = getScopeFilter(session);
+    const cachedPoints = await queryEquipmentTrailPoints({ tratorId, from, to, limit, session });
+    if (cachedPoints.length > 0) {
+      return NextResponse.json(cachedPoints, { status: 200 });
+    }
+
     const query = new URLSearchParams();
     if (from) query.set("from", from);
     if (to) query.set("to", to);
@@ -212,6 +129,7 @@ export async function GET(
         const normalized = normalizeTrailPoints(data, tratorId, new URL(url).pathname);
         if (normalized.length > 0) {
           points = normalized;
+          await appendEquipmentTrailPoints(normalized);
           break;
         }
       } catch (err) {
@@ -224,6 +142,9 @@ export async function GET(
         const { res, data } = await fetchJson(`${BASE}/api/equipamentos/status`);
         if (res.ok) {
           points = normalizeStatusPoints(data, tratorId).filter((item) => item.trator_id === tratorId);
+          if (points.length > 0) {
+            await appendEquipmentTrailPoints(points);
+          }
         }
       } catch (err) {
         console.warn(`[Proxy Rastro] Falha ao buscar snapshot de status para ${tratorId}: ${err}`);

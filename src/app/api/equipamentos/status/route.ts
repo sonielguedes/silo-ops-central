@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { IS_DEMO, SITE_URL } from "@/lib/app-env";
 import { normalizeEquipmentList } from "@/lib/api";
 import { filterItemsBySessionScope, getSessionFromRequest, normalizeScopeFields } from "@/lib/auth";
+import { appendEquipmentTrailPoints, buildTrailPointFromRecord } from "@/lib/equipment-trail-store";
 
 const B = (process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000").trim().replace(/\/$/, "");
 const ENDPOINT = "/api/equipamentos/status";
@@ -39,7 +40,15 @@ export async function GET(req: NextRequest) {
       return NextResponse.json([], { status: 200 });
     }
 
-    const items = filterItemsBySessionScope(withScope(normalizeEquipmentList(data)), session);
+    const normalized = withScope(normalizeEquipmentList(data));
+    const trailPoints = normalized
+      .map((item) => buildTrailPointFromRecord(item as unknown as Record<string, unknown>, item.trator_id, "status"))
+      .filter((item): item is NonNullable<typeof item> => Boolean(item));
+    if (trailPoints.length > 0) {
+      await appendEquipmentTrailPoints(trailPoints);
+    }
+
+    const items = filterItemsBySessionScope(normalized, session);
 
     return NextResponse.json(items, { status: 200 });
   } catch (e) {

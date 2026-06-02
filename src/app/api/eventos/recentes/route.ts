@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { IS_DEMO, SITE_URL } from "@/lib/app-env";
 import { decodeSessionCookie, SESSION_COOKIE_NAME } from "@/lib/auth";
+import { appendEquipmentTrailPoints, buildTrailPointFromRecord } from "@/lib/equipment-trail-store";
 
 const BASE = (process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "").trim().replace(/\/$/, "");
 const TECH_EMPTY = "Nenhum evento real recebido ainda";
@@ -70,6 +71,12 @@ export async function GET(req: NextRequest) {
     try {
       const { res, data } = await fetchUpstream(url);
       if (!res.ok) continue;
+      const trailPoints = (Array.isArray(data) ? data : [])
+        .map((item) => buildTrailPointFromRecord((item ?? {}) as Record<string, unknown>, String((item as { trator_id?: unknown }).trator_id ?? (item as { equipamento_id?: unknown }).equipamento_id ?? (item as { id?: unknown }).id ?? "evt"), "eventos-recentes"))
+        .filter((item): item is NonNullable<typeof item> => Boolean(item));
+      if (trailPoints.length > 0) {
+        await appendEquipmentTrailPoints(trailPoints);
+      }
       const eventos = normalizeEventos(data);
       return NextResponse.json({ eventos, status_tecnico: "ok", upstream_status: res.status }, { status: 200 });
     } catch (err) {

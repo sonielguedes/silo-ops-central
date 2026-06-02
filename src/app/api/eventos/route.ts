@@ -7,6 +7,7 @@ import {
   getSessionFromRequest,
   normalizeScopeFields,
 } from "@/lib/auth";
+import { appendEquipmentTrailPoints, buildTrailPointFromRecord } from "@/lib/equipment-trail-store";
 
 const BASE = (process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "").trim().replace(/\/$/, "");
 const TECH_EMPTY = "Nenhum evento real recebido ainda";
@@ -75,6 +76,12 @@ export async function GET(req: NextRequest) {
     if (!res.ok) {
       console.error("[SIL] /api/eventos upstream failed", { status: res.status, url });
       return tech(res.status, "upstream-not-ok");
+    }
+    const trailPoints = (Array.isArray(data) ? data : [])
+      .map((item) => buildTrailPointFromRecord((item ?? {}) as Record<string, unknown>, String((item as { trator_id?: unknown }).trator_id ?? (item as { equipamento_id?: unknown }).equipamento_id ?? (item as { id?: unknown }).id ?? "evt"), "eventos"))
+      .filter((item): item is NonNullable<typeof item> => Boolean(item));
+    if (trailPoints.length > 0) {
+      await appendEquipmentTrailPoints(trailPoints);
     }
     const eventos = filterItemsBySessionScope(normalizeEventos(data), session);
     return NextResponse.json(
