@@ -15,6 +15,7 @@ export interface Equipamento {
   trator_id: string; status: string; presence: string;
   last_seen: string; bateria: number | null; latitude: number | null;
   longitude: number | null; velocidade: number | null; app_version: string | null;
+  estado_operacional?: string | null;
   gps_source?: string | null;
   lat?: number | null;
   lng?: number | null;

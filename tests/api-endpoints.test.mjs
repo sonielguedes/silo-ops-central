@@ -135,7 +135,9 @@ test("map uses configurable equipment icons and menu exposes icon configuration"
   assert.match(mapSource, /iconAnchor:\s*\[38,\s*95\]/);
   assert.match(mapSource, /border-top:\s*12px solid \${statusColor}/);
   assert.match(sidebarSource, /\/equipamentos\/icones/);
+  assert.match(sidebarSource, /\/equipamentos\/rastro/);
   assert.equal(existsSync(new URL("../src/app/equipamentos/icones/page.tsx", import.meta.url)), true);
+  assert.equal(existsSync(new URL("../src/app/equipamentos/rastro/page.tsx", import.meta.url)), true);
 });
 
 test("map page only renders markers for valid coordinates and lists the reason for missing GPS", () => {
@@ -144,6 +146,18 @@ test("map page only renders markers for valid coordinates and lists the reason f
   assert.match(mapaSource, /resolveEquipmentCoordinates/);
   assert.match(mapaSource, /coord\.hasCoordinates/);
   assert.match(mapaSource, /coord\.reason/);
+});
+
+test("equipment list exposes direct trail navigation on each row", () => {
+  const equipmentsSource = readFileSync(new URL("../src/app/equipamentos/page.tsx", import.meta.url), "utf8");
+  const trailIndexSource = readFileSync(new URL("../src/app/equipamentos/rastro/page.tsx", import.meta.url), "utf8");
+
+  assert.match(equipmentsSource, /Ver Rastro/);
+  assert.match(equipmentsSource, /\/equipamentos\/\$\{eq\.trator_id\}\/rastro/);
+  assert.match(equipmentsSource, /Estado operacional/);
+  assert.match(trailIndexSource, /Rastro dos Equipamentos/);
+  assert.match(trailIndexSource, /Ver rastro/);
+  assert.match(trailIndexSource, /Último sinal/);
 });
 
 test("operations page does not slice nullable API fields directly", () => {
