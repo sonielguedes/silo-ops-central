@@ -194,9 +194,11 @@ test("sidebar exposes Power BI report page", () => {
 
 test("sidebar only exposes production-ready routes", () => {
   const sidebarSource = readFileSync(new URL("../src/components/Sidebar.tsx", import.meta.url), "utf8");
-  const routes = ["/", "/mapa", "/operacoes", "/equipamentos", "/equipamentos/icones", "/operadores", "/fazendas", "/telemetria", "/eventos", "/alertas", "/sincronizacao", "/configuracoes-op", "/relatorios", "/power-bi", "/auditoria", "/configuracoes"];
+  const routes = ["/", "/mapa", "/operacoes", "/equipamentos", "/equipamentos/icones", "/operadores", "/fazendas", "/telemetria", "/eventos", "/alertas", "/sincronizacao", "/configuracoes-op", "/relatorios", "/power-bi", "/auditoria", "/configuracoes", "/admin/empresas", "/admin/usinas", "/admin/unidades", "/admin/usuarios"];
 
   routes.forEach(route => assert.match(sidebarSource, new RegExp(route.replace(/\//g, "\\/"))));
+  assert.match(sidebarSource, /ADMINISTRAÇÃO/);
+  assert.match(sidebarSource, /Usuários e Permissões/);
 
   assert.doesNotMatch(sidebarSource, /\/sgpa\//);
   const sgpaPageUrl = new URL("../src/app/sgpa/[slug]/page.tsx", import.meta.url);
@@ -210,11 +212,13 @@ test("sidebar only exposes production-ready routes", () => {
         : route === "/equipamentos/icones"
           ? "../src/app/equipamentos/icones/page.tsx"
           : route === "/relatorios"
-            ? "../src/app/relatorios/page.tsx"
-            : route === "/sincronizacao"
-              ? "../src/app/sincronizacao/page.tsx"
+              ? "../src/app/relatorios/page.tsx"
+              : route === "/sincronizacao"
+                ? "../src/app/sincronizacao/page.tsx"
               : route === "/configuracoes"
                 ? "../src/app/configuracoes/page.tsx"
+                : route.startsWith("/admin/")
+                  ? `../src/app${route}/page.tsx`
                 : `../src/app${route}/page.tsx`;
     assert.equal(existsSync(new URL(pagePath, import.meta.url)), true, route);
   });
