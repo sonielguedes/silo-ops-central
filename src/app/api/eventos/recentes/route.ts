@@ -49,6 +49,10 @@ async function fetchUpstream(url: string) {
 
 export async function GET(req: NextRequest) {
   const sessionCookie = req.cookies.get(SESSION_COOKIE_NAME)?.value;
+  if (!sessionCookie) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
   const session = decodeSessionCookie(sessionCookie);
   if (!session) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
