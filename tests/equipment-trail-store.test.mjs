@@ -154,3 +154,70 @@ test("equipment trail store filters by tenant and date range", async () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("equipment trail store drops near-identical stationary points but keeps real movement and status changes", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "silo-trail-store-"));
+  const storePath = join(dir, "equipment-trail.json");
+
+  try {
+    const mod = await loadStoreModule(storePath);
+    await mod.appendEquipmentTrailPoints([
+      {
+        trator_id: "T01",
+        timestamp: "2026-06-02T10:00:00.000Z",
+        latitude: -10.0000,
+        longitude: -50.0000,
+        velocidade: 0.4,
+        status: "ONLINE",
+        origem: "status",
+        empresa_id: "SILOOPS",
+        usina_id: "USINA_PADRAO",
+        unidade_id: "UNIDADE_PADRAO",
+      },
+      {
+        trator_id: "T01",
+        timestamp: "2026-06-02T10:00:10.000Z",
+        latitude: -10.00001,
+        longitude: -50.00001,
+        velocidade: 0.2,
+        status: "ONLINE",
+        origem: "status",
+        empresa_id: "SILOOPS",
+        usina_id: "USINA_PADRAO",
+        unidade_id: "UNIDADE_PADRAO",
+      },
+      {
+        trator_id: "T01",
+        timestamp: "2026-06-02T10:00:20.000Z",
+        latitude: -10.00002,
+        longitude: -50.00002,
+        velocidade: 0.3,
+        status: "OFFLINE",
+        origem: "status",
+        empresa_id: "SILOOPS",
+        usina_id: "USINA_PADRAO",
+        unidade_id: "UNIDADE_PADRAO",
+      },
+      {
+        trator_id: "T01",
+        timestamp: "2026-06-02T10:00:30.000Z",
+        latitude: -10.00003,
+        longitude: -50.00003,
+        velocidade: 2.5,
+        status: "ONLINE",
+        origem: "status",
+        empresa_id: "SILOOPS",
+        usina_id: "USINA_PADRAO",
+        unidade_id: "UNIDADE_PADRAO",
+      },
+    ]);
+
+    const store = await mod.readEquipmentTrailStore();
+    assert.equal(store.points.length, 3);
+    assert.equal(store.points[0].status, "ONLINE");
+    assert.equal(store.points[1].status, "OFFLINE");
+    assert.equal(store.points[2].velocidade, 2.5);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

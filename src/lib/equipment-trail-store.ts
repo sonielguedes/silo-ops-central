@@ -83,6 +83,19 @@ function parseMs(value: string | null | undefined) {
   return Number.isFinite(ms) ? ms : null;
 }
 
+function haversineMeters(a: TrailPoint, b: TrailPoint) {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const r = 6371000;
+  const dLat = toRad(b.latitude - a.latitude);
+  const dLon = toRad(b.longitude - a.longitude);
+  const lat1 = toRad(a.latitude);
+  const lat2 = toRad(b.latitude);
+  const sinLat = Math.sin(dLat / 2);
+  const sinLon = Math.sin(dLon / 2);
+  const h = sinLat * sinLat + Math.cos(lat1) * Math.cos(lat2) * sinLon * sinLon;
+  return 2 * r * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
 function normalizePoint(point: Partial<TrailPoint>): TrailPoint | null {
   const latitude = Number(point.latitude);
   const longitude = Number(point.longitude);
@@ -156,6 +169,16 @@ function dedupeKey(point: TrailPoint) {
   return `${point.trator_id}|${point.timestamp}|${point.latitude}|${point.longitude}|${point.origem || ""}`;
 }
 
+function shouldDropJitter(prev: TrailPoint | undefined, next: TrailPoint) {
+  if (!prev) return false;
+  const prevSpeed = Number(prev.velocidade ?? 0);
+  const nextSpeed = Number(next.velocidade ?? 0);
+  const prevStatus = (prev.status || "").trim();
+  const nextStatus = (next.status || "").trim();
+  const distance = haversineMeters(prev, next);
+  return distance < 5 && prevStatus === nextStatus && prevSpeed <= 1 && nextSpeed <= 1;
+}
+
 function trimStore(points: TrailPoint[]) {
   const byTrator = new Map<string, TrailPoint[]>();
   for (const point of points) {
@@ -217,8 +240,18 @@ export async function appendEquipmentTrailPoints(points: Partial<TrailPoint>[]):
 
   return withWriteQueue(async () => {
     const store = await readEquipmentTrailStore();
-    const merged = [...store.points, ...normalized];
-    const deduped = Array.from(new Map(merged.map((point) => [dedupeKey(point), point])).values());
+    const merged = [...store.points, ...normalized].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+    const filtered: TrailPoint[] = [];
+    const lastByTractor = new Map<string, TrailPoint>();
+
+    for (const point of merged) {
+      const last = lastByTractor.get(point.trator_id);
+      if (shouldDropJitter(last, point)) continue;
+      filtered.push(point);
+      lastByTractor.set(point.trator_id, point);
+    }
+
+    const deduped = Array.from(new Map(filtered.map((point) => [dedupeKey(point), point])).values());
     return writeEquipmentTrailStore({ points: deduped, updated_at: nowIso() });
   });
 }
