@@ -11,8 +11,20 @@ export const DEMO_AUTH = {
 };
 
 export const OFFICIAL_PROD_AUTH = {
-  emails: ["soniel2013@gmail.com", "sonieloficial@gmail.com", "viewer@siloops.com.br"] as string[],
-  password: "SiloOps@2026",
+  credentials: [
+    {
+      email: "soniel2013@gmail.com",
+      password: "SiloOps@2026",
+    },
+    {
+      email: "sonieloficial@gmail.com",
+      password: "SiloOps@2026",
+    },
+    {
+      email: "viewer@siloops.com.br",
+      password: "Viewer@2026",
+    },
+  ] as const,
 } as const;
 
 export const PROD_AUTH_MODE = "prod" as const;
@@ -177,8 +189,9 @@ export function canUseProdLogin(email: string, password: string, adminEmail: str
   const matchesEnv = Boolean(normalizedAdminEmail && normalizedAdminPassword)
     && normalizedEmail === normalizedAdminEmail
     && normalizedPassword === normalizedAdminPassword;
-  const matchesOfficial = OFFICIAL_PROD_AUTH.emails.includes(normalizedEmail)
-    && normalizedPassword === OFFICIAL_PROD_AUTH.password;
+  const matchesOfficial = OFFICIAL_PROD_AUTH.credentials.some(
+    (credential) => credential.email === normalizedEmail && credential.password === normalizedPassword,
+  );
 
   return matchesEnv || matchesOfficial;
 }

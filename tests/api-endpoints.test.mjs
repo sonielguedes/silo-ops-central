@@ -237,6 +237,7 @@ test("demo login credentials are centralized and gated by demo environment", () 
 
   assert.match(authSource, /demo@siloops\.com\.br/);
   assert.match(authSource, /SiloOps@2026/);
+  assert.match(authSource, /Viewer@2026/);
   assert.match(authSource, /IS_DEMO/);
   assert.match(authSource, /canUseDemoLogin/);
   assert.match(authSource, /canUseProdLogin/);
@@ -292,6 +293,7 @@ test("viewer seed exists with tenant scope and read-only permissions", () => {
   const source = readFileSync(new URL("../src/lib/auth.ts", import.meta.url), "utf8");
 
   assert.match(source, /viewer@siloops\.com\.br[\s\S]*role:\s*"VIEWER"/);
+  assert.match(source, /viewer@siloops\.com\.br[\s\S]*Viewer@2026/);
   assert.match(source, /viewer@siloops\.com\.br[\s\S]*usinas:\s*\["USINA_PADRAO"\]/);
   assert.match(source, /viewer@siloops\.com\.br[\s\S]*unidades:\s*\["UNIDADE_PADRAO"\]/);
   assert.match(source, /viewer@siloops\.com\.br[\s\S]*read:dashboard/);
