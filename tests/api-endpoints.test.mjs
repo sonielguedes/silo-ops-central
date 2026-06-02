@@ -57,7 +57,7 @@ test("equipment trail page handles empty API payload without indexing points", (
   assert.match(pageSource, /stats\.duration === null/);
   assert.match(pageSource, /filteredPoints\.length === 0/);
   assert.match(pageSource, /emptyMessage=/);
-  assert.match(pageSource, /dynamic\(\(\) => import\("@\/components\/TrailMap"\), \{ ssr: false \}\)/);
+  assert.match(pageSource, /dynamic\(\(\) => import\("@\/components\/TrailMap"\), \{\s*ssr:\s*false,\s*loading:/s);
   assert.match(trailMapSource, /points\.length === 0/);
   assert.match(trailMapSource, /emptyMessage/);
 });

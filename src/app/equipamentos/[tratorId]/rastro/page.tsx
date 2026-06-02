@@ -18,7 +18,10 @@ type TrailPoint = GpsPoint & {
 
 type PeriodPreset = "6h" | "24h" | "72h" | "7d" | "all" | "custom";
 
-const TrailMapClient = dynamic(() => import("@/components/TrailMap"), { ssr: false });
+const TrailMapClient = dynamic(() => import("@/components/TrailMap"), {
+  ssr: false,
+  loading: () => <div className="card-p h-[520px] flex items-center justify-center text-[#4a6a8a]">Carregando mapa...</div>,
+});
 
 function haversineKm(a: TrailPoint, b: TrailPoint) {
   const R = 6371;
