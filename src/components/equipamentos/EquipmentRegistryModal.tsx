@@ -235,7 +235,7 @@ export default function EquipmentRegistryModal({
               <Section title="Cadastro">
                 <DetailRow label="Frota" value={row?.frota || "--"} />
                 <DetailRow label="ID Tecnico" value={row?.trator_id || "--"} />
-                <DetailRow label="Nome" value={empty(row?.master?.nome || row?.displayName)} />
+                <DetailRow label="Descrição" value={empty(row?.master?.nome || row?.displayName)} />
                 <DetailRow label="Tipo" value={row?.typeLabel || "--"} />
                 <DetailRow label="Modelo" value={empty(row?.model)} />
                 <DetailRow label="Grupo" value={empty(row?.group)} />
@@ -268,7 +268,7 @@ export default function EquipmentRegistryModal({
                   <Field label="Frota / Cod. Operacional" value={form.frota} onChange={(value) => setForm((prev) => ({ ...prev, frota: value }))} />
                   <Field label="ID Tecnico (Ex: T01)" value={form.trator_id} onChange={(value) => setForm((prev) => ({ ...prev, trator_id: value }))} disabled={lockId} />
                   <div className="sm:col-span-2">
-                    <Field label="Nome / Apelido" value={form.nome} onChange={(value) => setForm((prev) => ({ ...prev, nome: value }))} />
+                    <Field label="Descrição" value={form.nome} onChange={(value) => setForm((prev) => ({ ...prev, nome: value }))} />
                   </div>
                   <Field label="Tipo" value={form.tipo_equipamento} options={classificationOptions?.tipos} onChange={(value) => setForm((prev) => ({ ...prev, tipo_equipamento: value }))} />
                   <Field label="Modelo" value={form.modelo} options={classificationOptions?.modelos} onChange={(value) => setForm((prev) => ({ ...prev, modelo: value }))} />
@@ -283,7 +283,7 @@ export default function EquipmentRegistryModal({
               <Section title="Pre-visualizacao">
                 <DetailRow label="Frota" value={form.frota || "--"} />
                 <DetailRow label="ID Tecnico" value={form.trator_id || "--"} />
-                <DetailRow label="Nome" value={form.nome || "--"} />
+                <DetailRow label="Descrição" value={form.nome || "--"} />
                 <DetailRow label="Tipo" value={empty(form.tipo_equipamento)} />
                 <DetailRow label="Modelo" value={empty(form.modelo)} />
                 <DetailRow label="Grupo" value={empty(form.grupo)} />

@@ -133,7 +133,7 @@ export default function EquipamentoRastroPage() {
   const type = details ? getEquipmentType(details as unknown as Record<string, unknown>) : "OUTRO";
   const icon = details ? getIconForModel(type, {}) : null;
   const visual = details ? resolveEquipmentVisualState(details as unknown as Record<string, unknown>) : null;
-  const operationalId = details?.frota || tratorId;
+  const operationalId = details?.frota ? `${details.frota} — ${details.nome_equipamento || tratorId}` : (details?.nome_equipamento || tratorId);
 
   return (
     <div className="flex-1 flex flex-col min-h-screen">
