@@ -7,6 +7,8 @@ import ApiErr from "@/components/ApiErr";
 import Empty from "@/components/Empty";
 import EquipmentDetailsDrawer from "@/components/EquipmentDetailsDrawer";
 import { api, getOperationalPresenceInfo, resolveEquipmentCoordinates, timeAgo, type Equipamento, type GpsPoint } from "@/lib/api";
+import { fetchJson } from "@/lib/admin-tenant-client";
+import { VisualConfig } from "@/lib/equipment-visual-store";
 
 const MapComponent = dynamic(() => import("@/components/MapComponent"), {
   ssr: false,
@@ -19,6 +21,7 @@ const MapComponent = dynamic(() => import("@/components/MapComponent"), {
 
 export default function MapaClient() {
   const [equip, setEquip] = useState<Equipamento[]>([]);
+  const [visualConfigs, setVisualConfigs] = useState<VisualConfig[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [rastro, setRastro] = useState<GpsPoint[]>([]);
   const [err, setErr] = useState<string | null>(null);
@@ -30,9 +33,13 @@ export default function MapaClient() {
   const ref = useRef<(() => Promise<void>) | null>(null);
 
   const load = useCallback(async () => {
-    const equipResult = await api.equipamentos();
+    const [equipResult, visualResult] = await Promise.all([
+      api.equipamentos(),
+      fetchJson<VisualConfig[]>("/api/admin/equipamentos/visual")
+    ]);
 
     setEquip(equipResult.ok ? equipResult.data : []);
+    setVisualConfigs(visualResult.ok ? visualResult.data : []);
     setErr(equipResult.ok ? null : equipResult.error);
     setLastCheck(new Date().toLocaleTimeString("pt-BR"));
   }, []);
@@ -109,6 +116,7 @@ export default function MapaClient() {
           <div className="flex-1 relative border border-[#1e2d3d] rounded-2xl overflow-hidden bg-[#090e14] min-h-[520px]">
             <MapComponent
               equipamentosComGPS={comGPS}
+              visualConfigs={visualConfigs}
               selectedId={selectedId}
               rastro={rastro}
               onSelect={(eq) => setSelectedId((prev) => (prev === eq.trator_id ? null : eq.trator_id))}

@@ -157,7 +157,7 @@ test("map uses configurable equipment icons and menu exposes icon configuration"
   const mapSource = readFileSync(new URL("../src/components/MapComponent.tsx", import.meta.url), "utf8");
   const sidebarSource = readFileSync(new URL("../src/components/Sidebar.tsx", import.meta.url), "utf8");
 
-  assert.match(mapSource, /getIconForModel/);
+  assert.match(mapSource, /visualConfigs/);
   assert.match(mapSource, /renderEquipmentIconSvg/);
   assert.match(mapSource, /resolveEquipmentCoordinates/);
   assert.match(mapSource, /resolveEquipmentVisualState/);
@@ -675,6 +675,19 @@ test("operation and stop code registries expose shared store and admin api contr
   assert.match(paradasRoute, /upsertParada/);
   assert.match(operacoesPage, /\/api\/admin\/operacoes-cadastro/);
   assert.match(paradasPage, /\/api\/admin\/codigos-parada/);
+});
+
+test("equipment visual configuration registries expose shared store and admin api contract", () => {
+  assert.equal(existsSync(new URL("../src/lib/equipment-visual-store.ts", import.meta.url)), true);
+  const routeSource = readFileSync(new URL("../src/app/api/admin/equipamentos/visual/route.ts", import.meta.url), "utf8");
+  const idRouteSource = readFileSync(new URL("../src/app/api/admin/equipamentos/visual/[id]/route.ts", import.meta.url), "utf8");
+  const pageSource = readFileSync(new URL("../src/app/equipamentos/icones/page.tsx", import.meta.url), "utf8");
+
+  assert.match(routeSource, /readEquipmentVisualStore/);
+  assert.match(routeSource, /upsertVisualConfig/);
+  assert.match(idRouteSource, /readEquipmentVisualStore/);
+  assert.match(idRouteSource, /upsertVisualConfig/);
+  assert.match(pageSource, /\/api\/admin\/equipamentos\/visual/);
 });
 
 test("roadmap includes 3.4M as completed", () => {

@@ -3,12 +3,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { getOperationalPresenceInfo, resolveEquipmentCoordinates, type EquipmentCoordinateInfo, type Equipamento, type GpsPoint } from "@/lib/api";
-import { getEquipmentType, getIconForModel, readIconConfig, renderEquipmentIconSvg, resolveEquipmentVisualState, type EquipmentIconId } from "@/lib/equipment-icons";
+import { renderEquipmentIconSvg, resolveEquipmentVisualState, ALL_ICONS } from "@/lib/equipment-icons";
+import { VisualConfig } from "@/lib/equipment-visual-store";
 
 interface MapComponentProps {
   equipamentosComGPS: Equipamento[];
   selectedId: string | null;
   rastro?: GpsPoint[];
+  visualConfigs?: VisualConfig[];
   onSelect: (eq: Equipamento) => void;
   onDeselect?: () => void;
 }
@@ -17,6 +19,7 @@ export default function MapComponent({
   equipamentosComGPS,
   selectedId,
   rastro = [],
+  visualConfigs = [],
   onSelect,
   onDeselect
 }: MapComponentProps) {
@@ -29,19 +32,7 @@ export default function MapComponent({
   const lastSelectedIdRef = useRef<string | null>(null);
   const hasFittedRef = useRef(false);
   const [mapType, setMapType] = useState<"dark" | "satellite">("satellite");
-  const [iconConfig, setIconConfig] = useState<Record<string, EquipmentIconId>>({});
   const [zoomLevel, setZoomLevel] = useState(13);
-
-  useEffect(() => {
-    const refresh = () => setIconConfig(readIconConfig());
-    refresh();
-    window.addEventListener("sil-equipment-icons-updated", refresh);
-    window.addEventListener("storage", refresh);
-    return () => {
-      window.removeEventListener("sil-equipment-icons-updated", refresh);
-      window.removeEventListener("storage", refresh);
-    };
-  }, []);
 
   // 1. Inicia o Mapa
   useEffect(() => {
@@ -98,25 +89,28 @@ export default function MapComponent({
 
   // 3. Gerador de Ícones PADRONIZADOS (Nova Versão SILO OPS)
   const createIcon = useCallback((eq: Equipamento, isActive: boolean) => {
-    const model = getEquipmentType(eq);
-    const iconData = getIconForModel(model, iconConfig);
+    const type = (eq.tipo_equipamento || "DEFAULT").toUpperCase();
+    const config = visualConfigs.find(c => c.tipo_equipamento === type) || visualConfigs.find(c => c.tipo_equipamento === "DEFAULT");
+
+    const iconDef = ALL_ICONS.find(i => i.id === config?.icone) || ALL_ICONS.find(i => i.id === "default");
     const statusTone = resolveEquipmentVisualState(eq as unknown as Record<string, unknown>);
+
+    let statusColor = config?.cor_online || "#22c55e";
+    if (statusTone.key === "OFFLINE") statusColor = config?.cor_offline || "#ef4444";
+    if (statusTone.key === "INSTAVEL") statusColor = config?.cor_instavel || "#f59e0b";
+
     const presenceTone = getOperationalPresenceInfo(eq.last_seen);
-    const statusColor = statusTone.color;
-    const typeColor = iconData.color;
     const isOffline = statusTone.key === "OFFLINE";
     const isInstavel = statusTone.key === "INSTAVEL";
-    const cadastroLabel = eq.cadastro_status === "SEM_TELEMETRIA"
-      ? "Sem telemetria"
-      : eq.cadastro_status === "NAO_CADASTRADO"
-        ? "Não cadastrado"
-        : null;
+
     const compact = zoomLevel < 14;
     const outerWidth = compact ? 62 : 76;
     const outerHeight = compact ? 88 : 102;
     const circleSize = compact ? 44 : 52;
     const iconSize = compact ? 22 : 28;
-    const direction = isActive && rastro.length > 1
+
+    // Heading calculation
+    const direction = (config?.rotaciona_icone && isActive && rastro.length > 1)
       ? (() => {
           const prev = rastro[rastro.length - 2];
           const last = rastro[rastro.length - 1];
@@ -130,6 +124,8 @@ export default function MapComponent({
           return (toDeg(Math.atan2(y, x)) + 360) % 360;
         })()
       : null;
+
+    const label = `${eq.trator_id} · ${statusTone.short}`;
 
     return L.divIcon({
       className: "sil-marker-node",
@@ -146,6 +142,7 @@ export default function MapComponent({
           transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         ">
           <!-- Badge Superior -->
+          ${config?.mostrar_label ? `
           <div style="
             display: flex;
             align-items: center;
@@ -165,17 +162,15 @@ export default function MapComponent({
             text-transform: uppercase;
           ">
             <span style="width: 7px; height: 7px; border-radius: 999px; background: ${statusColor}; box-shadow: 0 0 8px ${statusColor};"></span>
-            <span>${eq.trator_id}</span>
-            <span style="color:${statusColor};">${statusTone.short}</span>
-            ${compact ? "" : `<span style="color:#7f9bb8;font-size:9px;">${presenceTone.label}</span>`}
-            ${cadastroLabel ? `<span style="color:#9fb3c8;font-size:9px;">${cadastroLabel}</span>` : ""}
+            <span>${label}</span>
           </div>
+          ` : ""}
 
           <!-- Círculo Principal com Ícone -->
           <div style="
             width: ${circleSize}px;
             height: ${circleSize}px;
-            background: radial-gradient(circle at 35% 30%, rgba(255,255,255,0.18), rgba(255,255,255,0.02) 42%, rgba(0,0,0,0.22) 100%), ${typeColor};
+            background: radial-gradient(circle at 35% 30%, rgba(255,255,255,0.18), rgba(255,255,255,0.02) 42%, rgba(0,0,0,0.22) 100%), ${statusColor}dd;
             border: 3px solid ${statusColor};
             border-radius: 18px 18px 18px 4px;
             display: flex;
@@ -187,10 +182,10 @@ export default function MapComponent({
             z-index: 1000;
             position: relative;
             overflow: visible;
-            ${isOffline ? "filter: grayscale(1) brightness(0.86);" : isInstavel ? "filter: saturate(0.8) brightness(0.92);" : ""}
+            ${isOffline ? "filter: grayscale(0.5) brightness(0.8);" : ""}
           ">
-            <div style="width: ${iconSize}px; height: ${iconSize}px; display: flex; align-items: center; justify-content: center;">
-                ${renderEquipmentIconSvg(iconData.svgPath, iconSize)}
+            <div style="width: ${iconSize}px; height: ${iconSize}px; display: flex; align-items: center; justify-content: center; ${direction !== null ? `transform: rotate(${direction}deg);` : ""}">
+                ${renderEquipmentIconSvg(iconDef?.svgPath || "", iconSize)}
             </div>
             ${direction !== null ? `<div style="position:absolute;right:-7px;top:-7px;width:18px;height:18px;display:flex;align-items:center;justify-content:center;transform:rotate(${direction}deg);background:rgba(5,10,15,0.9);border:1px solid ${statusColor};border-radius:999px;color:${statusColor};font-size:10px;box-shadow:0 0 8px rgba(0,0,0,0.35);">▲</div>` : ""}
 
@@ -214,7 +209,7 @@ export default function MapComponent({
       iconSize: [outerWidth, outerHeight],
       iconAnchor: [outerWidth / 2, outerHeight - 7]
     });
-  }, [iconConfig, zoomLevel, rastro]);
+  }, [visualConfigs, zoomLevel, rastro]);
 
   // 4. Gestão de Marcadores e Centralização Inteligente
   useEffect(() => {
