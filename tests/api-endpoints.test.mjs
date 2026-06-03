@@ -74,6 +74,17 @@ test("equipment trail page handles empty API payload without indexing points", (
   assert.match(pageSource, /Evento \/ motivo/);
 });
 
+test("trail map defaults to satellite and offers map fallback toggle", () => {
+  const trailMapSource = readFileSync(new URL("../src/components/TrailMap.tsx", import.meta.url), "utf8");
+  const trailPageSource = readFileSync(new URL("../src/app/equipamentos/[tratorId]/rastro/page.tsx", import.meta.url), "utf8");
+
+  assert.match(trailMapSource, /World_Imagery/);
+  assert.match(trailMapSource, /Satélite/);
+  assert.match(trailMapSource, /Mapa/);
+  assert.match(trailMapSource, /satellite/i);
+  assert.match(trailPageSource, /TrailMap/);
+});
+
 test("/api/equipamentos/status requires session and returns unauthorized JSON", () => {
   const routeSource = readFileSync(new URL("../src/app/api/equipamentos/status/route.ts", import.meta.url), "utf8");
 

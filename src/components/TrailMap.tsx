@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { GpsPoint } from "@/lib/api";
@@ -11,11 +11,26 @@ type TrailMapProps = {
   emptyMessage?: string;
 };
 
+type LayerMode = "satellite" | "map";
+
+const SATELLITE_URL = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
+const SATELLITE_ATTRIBUTION = "Tiles © Esri";
+const MAP_URL = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+const MAP_ATTRIBUTION = "Map tiles © OpenStreetMap contributors © CARTO";
+
 export default function TrailMap({ points, title = "Trajeto", emptyMessage }: TrailMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const tileRef = useRef<L.TileLayer | null>(null);
   const layerRef = useRef<L.LayerGroup | null>(null);
+  const [mode, setMode] = useState<LayerMode>("satellite");
+  const modeRef = useRef<LayerMode>("satellite");
+  const satelliteFallbackRef = useRef(false);
+
+  useEffect(() => {
+    modeRef.current = mode;
+    if (mode === "satellite") satelliteFallbackRef.current = false;
+  }, [mode]);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -40,13 +55,35 @@ export default function TrailMap({ points, title = "Trajeto", emptyMessage }: Tr
     const map = mapRef.current;
     if (!map) return;
 
-    if (tileRef.current) map.removeLayer(tileRef.current);
-    const layer = L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+    if (tileRef.current) {
+      map.removeLayer(tileRef.current);
+      tileRef.current = null;
+    }
+
+    const isSatellite = mode === "satellite";
+    const layer = L.tileLayer(isSatellite ? SATELLITE_URL : MAP_URL, {
       maxZoom: 22,
-      attribution: "SILO OPS",
-    }).addTo(map);
+      attribution: isSatellite ? SATELLITE_ATTRIBUTION : MAP_ATTRIBUTION,
+      crossOrigin: true,
+    });
+
+    const onTileError = () => {
+      if (!isSatellite || satelliteFallbackRef.current) return;
+      satelliteFallbackRef.current = true;
+      setMode("map");
+    };
+
+    if (isSatellite) {
+      layer.on("tileerror", onTileError);
+    }
+
+    layer.addTo(map);
     tileRef.current = layer;
-  }, []);
+
+    return () => {
+      layer.off("tileerror", onTileError);
+    };
+  }, [mode]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -96,6 +133,22 @@ export default function TrailMap({ points, title = "Trajeto", emptyMessage }: Tr
         .leaflet-control-zoom a { background: #101b2d !important; color: #c8d8e8 !important; border-color: #1f334d !important; }
         .leaflet-control-attribution { background: rgba(5,10,15,0.75) !important; color: #4a6a8a !important; }
       ` }} />
+      <div className="absolute top-4 right-4 z-[3] flex items-center gap-2 rounded-2xl border border-[#1f334d] bg-[#0d1420]/90 p-1 shadow-2xl backdrop-blur">
+        <button
+          type="button"
+          onClick={() => setMode("satellite")}
+          className={`rounded-xl px-3 py-2 text-[11px] font-black uppercase tracking-widest transition-colors ${modeRef.current === "satellite" ? "bg-[#00d4ff] text-[#041018]" : "text-[#c8d8e8] hover:text-white"}`}
+        >
+          Satélite
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode("map")}
+          className={`rounded-xl px-3 py-2 text-[11px] font-black uppercase tracking-widest transition-colors ${modeRef.current === "map" ? "bg-[#00d4ff] text-[#041018]" : "text-[#c8d8e8] hover:text-white"}`}
+        >
+          Mapa
+        </button>
+      </div>
       <div ref={containerRef} className="absolute inset-0" aria-label={title} />
       {points.length === 0 && (
         <div className="absolute inset-0 z-[2] flex items-center justify-center pointer-events-none bg-[linear-gradient(180deg,rgba(9,14,20,0.20),rgba(9,14,20,0.72))]">
