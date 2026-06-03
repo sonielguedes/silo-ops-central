@@ -3,9 +3,11 @@
 ## Objetivo
 Registrar a trilha da Fase 3.x com o que ja foi concluido e o que ainda falta.
 
-## Fonte mestre
-- [SPEC_DRIVEN_DEVELOPMENT.md](./SPEC_DRIVEN_DEVELOPMENT.md)
-- Este roadmap eh um resumo operacional. O documento mestre define a visao consolidada do projeto.
+## Regra de documentacao
+- Nao usar SPEC grande.
+- Usar mini-spec por fase, no maximo 20 linhas.
+- Cada fase registra somente: objetivo, arquivos principais, regras criticas, validacao e hash final.
+- Este roadmap e o resumo operacional; nao existe documento mestre longo.
 
 ## Concluido
 - 3.4A SSR mapa
