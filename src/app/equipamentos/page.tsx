@@ -9,6 +9,7 @@ import Badge from "@/components/Badge";
 import ApiErr from "@/components/ApiErr";
 import EmptyState from "@/components/dashboard/EmptyState";
 import EquipmentRegistryModal, {
+  type EquipmentClassificationOptions,
   type EquipmentFormValues,
   type EquipmentMasterRecord,
   type EquipmentRegistryRow,
@@ -21,6 +22,12 @@ type FetchResult<T> = { ok: true; data: T } | { ok: false; error: string; status
 type AdminEquipmentPayload = EquipmentMasterRecord & Record<string, unknown>;
 
 const ADMIN_ENDPOINT = "/api/admin/equipamentos";
+const CLASSIFICATION_ENDPOINTS = {
+  tipos: "/api/admin/equipamentos/tipos",
+  modelos: "/api/admin/equipamentos/modelos",
+  grupos: "/api/admin/equipamentos/grupos",
+  perfis: "/api/admin/equipamentos/perfis",
+};
 
 function normalizeText(value: unknown) {
   return typeof value === "string" ? value.trim() : value === null || value === undefined ? "" : String(value).trim();
@@ -59,6 +66,23 @@ async function fetchAdminEquipment(): Promise<FetchResult<AdminEquipmentPayload[
     const message = err instanceof Error ? err.message : String(err);
     return { ok: false, error: message || "Falha ao carregar cadastro mestre.", status: 0 };
   }
+}
+
+async function fetchClassificationOptions(): Promise<EquipmentClassificationOptions> {
+  const read = async (endpoint: string) => {
+    const res = await fetch(endpoint, { cache: "no-store", signal: AbortSignal.timeout(7000) });
+    const text = await res.text();
+    const parsed = text.trim() ? JSON.parse(text) : [];
+    return res.ok && Array.isArray(parsed) ? parsed : [];
+  };
+  const [tipos, modelos, grupos, perfis] = await Promise.all([
+    read(CLASSIFICATION_ENDPOINTS.tipos),
+    read(CLASSIFICATION_ENDPOINTS.modelos),
+    read(CLASSIFICATION_ENDPOINTS.grupos),
+    read(CLASSIFICATION_ENDPOINTS.perfis),
+  ]);
+  const names = (items: Record<string, unknown>[]) => items.map((item) => normalizeText(item.nome || item.codigo)).filter(Boolean);
+  return { tipos: names(tipos), modelos: names(modelos), grupos: names(grupos), perfis: names(perfis) };
 }
 
 function normalizeMasterRecord(item: AdminEquipmentPayload): EquipmentMasterRecord & { id: string } {
@@ -180,6 +204,7 @@ export default function EquipamentosPage() {
 
   const [masterRaw, setMasterRaw] = useState<EquipmentMasterRecord[]>([]);
   const [liveRaw, setLiveRaw] = useState<Equipamento[]>([]);
+  const [classificationOptions, setClassificationOptions] = useState<EquipmentClassificationOptions>({ tipos: [], modelos: [], grupos: [], perfis: [] });
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -195,7 +220,7 @@ export default function EquipamentosPage() {
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
-    const [masterRes, liveRes] = await Promise.all([fetchAdminEquipment(), api.equipamentos()]);
+    const [masterRes, liveRes, classificationRes] = await Promise.all([fetchAdminEquipment(), api.equipamentos(), fetchClassificationOptions()]);
 
     if (masterRes.ok) {
       setMasterRaw(masterRes.data.map(normalizeMasterRecord));
@@ -208,6 +233,7 @@ export default function EquipamentosPage() {
     }
 
     setLiveRaw(liveRes.ok ? liveRes.data : []);
+    setClassificationOptions(classificationRes);
     setLoading(false);
   }, [canWrite]);
 
@@ -487,6 +513,7 @@ export default function EquipamentosPage() {
         row={modalMode ? (activeRow || null) : null}
         canWrite={canWrite}
         masterAvailable={masterAvailable}
+        classificationOptions={classificationOptions}
         saving={saving}
         error={modalError}
         onClose={() => {

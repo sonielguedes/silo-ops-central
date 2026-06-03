@@ -57,12 +57,20 @@ export type EquipmentFormValues = {
   status: string;
 };
 
+export type EquipmentClassificationOptions = {
+  tipos: string[];
+  modelos: string[];
+  grupos: string[];
+  perfis: string[];
+};
+
 type Props = {
   open: boolean;
   mode: "create" | "edit" | "details";
   row: EquipmentRegistryRow | null;
   canWrite: boolean;
   masterAvailable: boolean;
+  classificationOptions?: EquipmentClassificationOptions;
   saving?: boolean;
   error?: string | null;
   onClose: () => void;
@@ -119,6 +127,7 @@ export default function EquipmentRegistryModal({
   row,
   canWrite,
   masterAvailable,
+  classificationOptions,
   saving = false,
   error = null,
   onClose,
@@ -251,10 +260,10 @@ export default function EquipmentRegistryModal({
                 <div className="grid gap-3 sm:grid-cols-2">
                   <Field label="Identificador" value={form.trator_id} onChange={(value) => setForm((prev) => ({ ...prev, trator_id: value }))} disabled={lockId} />
                   <Field label="Nome" value={form.nome} onChange={(value) => setForm((prev) => ({ ...prev, nome: value }))} />
-                  <Field label="Tipo" value={form.tipo_equipamento} onChange={(value) => setForm((prev) => ({ ...prev, tipo_equipamento: value }))} />
-                  <Field label="Modelo" value={form.modelo} onChange={(value) => setForm((prev) => ({ ...prev, modelo: value }))} />
-                  <Field label="Grupo" value={form.grupo} onChange={(value) => setForm((prev) => ({ ...prev, grupo: value }))} />
-                  <Field label="Perfil" value={form.perfil} onChange={(value) => setForm((prev) => ({ ...prev, perfil: value }))} />
+                  <Field label="Tipo" value={form.tipo_equipamento} options={classificationOptions?.tipos} onChange={(value) => setForm((prev) => ({ ...prev, tipo_equipamento: value }))} />
+                  <Field label="Modelo" value={form.modelo} options={classificationOptions?.modelos} onChange={(value) => setForm((prev) => ({ ...prev, modelo: value }))} />
+                  <Field label="Grupo" value={form.grupo} options={classificationOptions?.grupos} onChange={(value) => setForm((prev) => ({ ...prev, grupo: value }))} />
+                  <Field label="Perfil" value={form.perfil} options={classificationOptions?.perfis} onChange={(value) => setForm((prev) => ({ ...prev, perfil: value }))} />
                   <div className="sm:col-span-2">
                     <Field label="Status" value={form.status} onChange={(value) => setForm((prev) => ({ ...prev, status: value }))} />
                   </div>
@@ -327,14 +336,17 @@ export default function EquipmentRegistryModal({
 function Field({
   label,
   value,
+  options,
   onChange,
   disabled = false,
 }: {
   label: string;
   value: string;
+  options?: string[];
   onChange: (value: string) => void;
   disabled?: boolean;
 }) {
+  const listId = `${label.toLowerCase().replace(/\s+/g, "-")}-options`;
   return (
     <label className="block">
       <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.18em] text-[#4a6a8a]">{label}</span>
@@ -343,7 +355,13 @@ function Field({
         value={value}
         onChange={(ev) => onChange(ev.target.value)}
         disabled={disabled}
+        list={options?.length ? listId : undefined}
       />
+      {options?.length ? (
+        <datalist id={listId}>
+          {options.map((option) => <option key={option} value={option} />)}
+        </datalist>
+      ) : null}
     </label>
   );
 }

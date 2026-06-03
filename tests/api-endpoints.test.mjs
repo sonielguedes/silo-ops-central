@@ -238,6 +238,27 @@ test("cadastros operacionais placeholder shell exists", () => {
   assert.match(docSource, /\/cadastros\/equipamentos\/tipos/);
 });
 
+test("equipment classification registries expose shared store and admin api contract", () => {
+  const storeExists = existsSync(new URL("../src/lib/equipment-classification-store.ts", import.meta.url));
+  const tiposRoute = readFileSync(new URL("../src/app/api/admin/equipamentos/tipos/route.ts", import.meta.url), "utf8");
+  const tiposIdRoute = readFileSync(new URL("../src/app/api/admin/equipamentos/tipos/[id]/route.ts", import.meta.url), "utf8");
+  const modelosRoute = readFileSync(new URL("../src/app/api/admin/equipamentos/modelos/route.ts", import.meta.url), "utf8");
+  const gruposRoute = readFileSync(new URL("../src/app/api/admin/equipamentos/grupos/route.ts", import.meta.url), "utf8");
+  const perfisRoute = readFileSync(new URL("../src/app/api/admin/equipamentos/perfis/route.ts", import.meta.url), "utf8");
+  const estadosRoute = readFileSync(new URL("../src/app/api/admin/equipamentos/estados/route.ts", import.meta.url), "utf8");
+
+  assert.equal(storeExists, true);
+  assert.match(tiposRoute, /equipment-classification-api/);
+  assert.match(tiposRoute, /createClassificationListRoute/);
+  assert.match(tiposRoute, /createClassificationCreateRoute/);
+  assert.match(tiposIdRoute, /GET/);
+  assert.match(tiposIdRoute, /PUT/);
+  assert.match(modelosRoute, /equipment-classification-api/);
+  assert.match(gruposRoute, /equipment-classification-api/);
+  assert.match(perfisRoute, /equipment-classification-api/);
+  assert.match(estadosRoute, /equipment-classification-api/);
+});
+
 test("api/eventos route returns controlled technical empty payload", () => {
   const routeSource = readFileSync(new URL("../src/app/api/eventos/route.ts", import.meta.url), "utf8");
 
