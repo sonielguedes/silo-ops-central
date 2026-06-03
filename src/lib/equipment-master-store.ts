@@ -5,7 +5,7 @@ import { canAccessEmpresa, isAdminGlobal, type SessionPayload } from "@/lib/auth
 
 export const EQUIPMENT_MASTER_STORE_PATH = (process.env.EQUIPMENT_MASTER_STORE_PATH || "/app/data/equipment-master.json").trim();
 
-export type EquipmentMasterStatus = "ATIVO" | "INATIVO" | "MANUTENCAO" | "BLOQUEADO";
+export type EquipmentMasterStatus = "ATIVO" | "INATIVO" | "MANUTENCAO" | "BLOQUEADO" | "RASCUNHO";
 export type EquipmentMasterUnitMeasure = "HORA" | "KM" | "HA" | "CICLO";
 
 export interface EquipmentMasterRecord {
@@ -74,7 +74,7 @@ export interface EquipmentMasterLookup {
   unidade_id?: string;
 }
 
-const STATUS_VALUES: EquipmentMasterStatus[] = ["ATIVO", "INATIVO", "MANUTENCAO", "BLOQUEADO"];
+const STATUS_VALUES: EquipmentMasterStatus[] = ["ATIVO", "INATIVO", "MANUTENCAO", "BLOQUEADO", "RASCUNHO"];
 const UNIT_VALUES: EquipmentMasterUnitMeasure[] = ["HORA", "KM", "HA", "CICLO"];
 const EMPTY_STORE: EquipmentMasterStore = { items: [], updated_at: new Date(0).toISOString() };
 const SEED_ITEMS: EquipmentMasterRecord[] = [
@@ -150,6 +150,18 @@ export function normalizeFrotaCode(value: unknown) {
   return "";
 }
 
+export class EquipmentMasterValidationError extends Error {
+  status: number;
+  code: string;
+
+  constructor(code: string, message: string, status = 400) {
+    super(message);
+    this.name = "EquipmentMasterValidationError";
+    this.code = code;
+    this.status = status;
+  }
+}
+
 function toLooseText(value: unknown, fallback = "") {
   if (typeof value === "string" && value.trim()) return value.trim();
   if (typeof value === "number" && Number.isFinite(value)) return String(value);
@@ -203,7 +215,7 @@ function normalizeRecord(raw: Partial<EquipmentMasterRecord>, fallbackIndex = 0)
     grupo: toText(raw.grupo, ""),
     perfil: toText(raw.perfil, ""),
     placa: toText(raw.placa, ""),
-    frota: toText(raw.frota, ""),
+    frota: normalizeFrotaCode(raw.frota),
     fabricante: toText(raw.fabricante, ""),
     ano: toLooseText(raw.ano, ""),
     status: normalizeStatus(raw.status),
@@ -301,12 +313,24 @@ function assertRequiredInput(input: EquipmentMasterInput) {
   const nome = toText(input.nome, "");
   const tipo = toText(input.tipo_equipamento, "");
   if (!tratorId || !nome || !tipo) {
-    throw new Error("trator_id, nome e tipo_equipamento são obrigatórios");
+    throw new EquipmentMasterValidationError("required_fields", "trator_id, nome e tipo_equipamento são obrigatórios", 400);
   }
+}
+
+function isActiveStatus(status: string) {
+  return status === "ATIVO";
+}
+
+function hasText(value: string) {
+  return value.trim().length > 0;
 }
 
 function compositeKey(item: Pick<EquipmentMasterRecord, "empresa_id" | "usina_id" | "unidade_id" | "trator_id">) {
   return [item.empresa_id, item.usina_id, item.unidade_id, item.trator_id].join("|");
+}
+
+function tenantKey(item: Pick<EquipmentMasterRecord, "empresa_id" | "usina_id" | "unidade_id">) {
+  return [item.empresa_id, item.usina_id, item.unidade_id].join("|");
 }
 
 function normalizeLookupScope(lookup: EquipmentMasterLookup) {
@@ -342,6 +366,10 @@ export function listActiveEquipmentMaster(items: EquipmentMasterRecord[], sessio
   return listAccessibleEquipmentMaster(items, session || null).filter((item) => item.status === "ATIVO");
 }
 
+export function listMobileEquipmentMaster(items: EquipmentMasterRecord[], session?: SessionPayload | null) {
+  return listAccessibleEquipmentMaster(items, session || null).filter((item) => item.status === "ATIVO" && hasText(item.frota) && hasText(item.tipo_equipamento));
+}
+
 export function enrichEquipmentStatusWithMaster<T extends Record<string, unknown>>(statusItem: T, master: EquipmentMasterRecord | null) {
   if (!master) {
     return {
@@ -373,7 +401,22 @@ export function enrichEquipmentStatusWithMaster<T extends Record<string, unknown
 function assertCompositeUnique(items: EquipmentMasterRecord[], candidate: EquipmentMasterRecord) {
   const conflict = items.find((item) => item.id !== candidate.id && compositeKey(item) === compositeKey(candidate));
   if (conflict) {
-    throw new Error("trator_id deve ser único por empresa_id, usina_id e unidade_id");
+    throw new EquipmentMasterValidationError("duplicate_trator", "trator_id deve ser único por empresa_id, usina_id e unidade_id", 409);
+  }
+}
+
+function assertUniqueFrota(items: EquipmentMasterRecord[], candidate: EquipmentMasterRecord) {
+  const frota = normalizeFrotaCode(candidate.frota);
+  if (!frota) return;
+  const conflict = items.find((item) => item.id !== candidate.id && normalizeFrotaCode(item.frota) === frota && tenantKey(item) === tenantKey(candidate));
+  if (conflict) {
+    throw new EquipmentMasterValidationError("duplicate_frota", "frota deve ser única por empresa_id, usina_id e unidade_id", 409);
+  }
+}
+
+function assertActiveHasFrota(candidate: EquipmentMasterRecord) {
+  if (isActiveStatus(candidate.status) && !hasText(candidate.frota)) {
+    throw new EquipmentMasterValidationError("missing_frota", "frota é obrigatória para equipamento ativo", 400);
   }
 }
 
@@ -427,7 +470,7 @@ export function normalizeEquipmentMasterInput(input: EquipmentMasterInput, exist
     grupo: toText(input.grupo, existing?.grupo || ""),
     perfil: toText(input.perfil, existing?.perfil || ""),
     placa: toText(input.placa, existing?.placa || ""),
-    frota: toText(input.frota, existing?.frota || ""),
+    frota: normalizeFrotaCode(input.frota ?? existing?.frota ?? ""),
     fabricante: toText(input.fabricante, existing?.fabricante || ""),
     ano: toLooseText(input.ano, existing?.ano || ""),
     status: normalizeStatus(input.status || existing?.status),
@@ -459,6 +502,8 @@ export async function upsertEquipmentMaster(input: EquipmentMasterInput, session
       throw new Error("fora do escopo do tenant");
     }
 
+    assertActiveHasFrota(candidate);
+    assertUniqueFrota(store.items, candidate);
     assertCompositeUnique(store.items, candidate);
 
     const items = store.items.filter((item) => item.id !== candidate.id && item.trator_id !== candidate.trator_id);

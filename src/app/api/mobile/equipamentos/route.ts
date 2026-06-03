@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/auth";
-import { listActiveEquipmentMaster, readEquipmentMasterStore } from "@/lib/equipment-master-store";
+import { listMobileEquipmentMaster, readEquipmentMasterStore } from "@/lib/equipment-master-store";
 
 export const runtime = "nodejs";
 
@@ -11,6 +11,6 @@ export async function GET(req: NextRequest) {
   }
 
   const store = await readEquipmentMasterStore();
-  const items = listActiveEquipmentMaster(store.items, session);
+  const items = listMobileEquipmentMaster(store.items, session);
   return NextResponse.json(items, { status: 200 });
 }

@@ -1,4 +1,4 @@
-import assert from "node:assert/strict";
+﻿import assert from "node:assert/strict";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -223,6 +223,7 @@ if (existsSync(storeFsPath)) {
 
       const created = await upsertFn({
         trator_id: "T99",
+        frota: "700010",
         empresa_id: "SILOOPS",
         usina_id: "USINA_PADRAO",
         unidade_id: "UNIDADE_PADRAO",
@@ -232,22 +233,26 @@ if (existsSync(storeFsPath)) {
       });
       assert.ok(created);
 
-      await assert.rejects(
-        () => upsertFn({
+      try {
+        await upsertFn({
           id: "ALT_1",
           trator_id: "T99",
+          frota: "700011",
           empresa_id: "SILOOPS",
           usina_id: "USINA_PADRAO",
           unidade_id: "UNIDADE_PADRAO",
           nome: "Conflito",
           tipo_equipamento: "TRATOR",
           status: "ATIVO",
-        }),
-        /trator_id deve ser/,
-      );
+        });
+        assert.fail("expected duplicate_trator validation error");
+      } catch (err) {
+        assert.equal(err?.code, "duplicate_trator");
+        assert.equal(err?.status, 409);
+      }
 
-      await assert.rejects(
-        () => upsertFn({
+      try {
+        await upsertFn({
           id: "VIEWER_1",
           trator_id: "T100",
           empresa_id: "SILOOPS",
@@ -256,9 +261,11 @@ if (existsSync(storeFsPath)) {
           nome: "Sem escrita",
           tipo_equipamento: "TRATOR",
           status: "ATIVO",
-        }, { role: "VIEWER", empresa_id: "SILOOPS", usinas: ["USINA_PADRAO"], unidades: ["UNIDADE_PADRAO"] }),
-        /fora do escopo do tenant/,
-      );
+        }, { role: "VIEWER", empresa_id: "SILOOPS", usinas: ["USINA_PADRAO"], unidades: ["UNIDADE_PADRAO"] });
+        assert.fail("expected tenant scope validation error");
+      } catch (err) {
+        assert.match(String(err?.message ?? err), /fora do escopo do tenant/);
+      }
 
       const refreshed = await readFn();
       const scoped = filterFn(refreshed.items, { role: "VIEWER", empresa_id: "SILOOPS", usinas: ["USINA_PADRAO"], unidades: ["UNIDADE_PADRAO"] });
@@ -301,9 +308,10 @@ if (existsSync(storeFsPath)) {
     const upsertFn = storeMod.upsertEquipmentMaster ?? storeMod.upsertEquipment ?? storeMod.upsertItem;
     const readFn = storeMod.readEquipmentMasterStore ?? storeMod.readEquipmentStore ?? storeMod.readStore;
     const mergeFn = storeMod.enrichEquipmentStatusWithMaster ?? storeMod.mergeEquipmentMasterStatus;
-      const findByFrotaFn = storeMod.findEquipmentMasterRecordByFrota ?? storeMod.resolveEquipmentMasterByFrota;
-      const listActiveFn = storeMod.listActiveEquipmentMaster ?? storeMod.listActiveEquipmentMasterBySession;
-      const normalizeFrotaFn = storeMod.normalizeFrotaCode ?? storeMod.normalizeFleetCode;
+    const findByFrotaFn = storeMod.findEquipmentMasterRecordByFrota ?? storeMod.resolveEquipmentMasterByFrota;
+    const listActiveFn = storeMod.listActiveEquipmentMaster ?? storeMod.listActiveEquipmentMasterBySession;
+    const listMobileFn = storeMod.listMobileEquipmentMaster ?? storeMod.listActiveMobileEquipmentMaster;
+    const normalizeFrotaFn = storeMod.normalizeFrotaCode ?? storeMod.normalizeFleetCode;
 
       await upsertFn({
         id: "T01",
@@ -336,9 +344,42 @@ if (existsSync(storeFsPath)) {
       assert.equal(findByFrotaFn(store.items, " 602040 ", { role: "ADMIN_GLOBAL", empresa_id: "SILOOPS", usinas: ["*"], unidades: ["*"] })?.trator_id, "T01");
       assert.equal(findByFrotaFn(store.items, "999999", { role: "ADMIN_GLOBAL", empresa_id: "SILOOPS", usinas: ["*"], unidades: ["*"] }), null);
       assert.deepEqual(
-        listActiveFn(store.items, { role: "ADMIN_GLOBAL", empresa_id: "SILOOPS", usinas: ["*"], unidades: ["*"] }).map((item) => item.trator_id).sort(),
-        ["T01", "T02"],
+        listMobileFn(store.items, { role: "ADMIN_GLOBAL", empresa_id: "SILOOPS", usinas: ["*"], unidades: ["*"] }).map((item) => item.trator_id),
+        ["T01"],
       );
+
+      try {
+        await upsertFn({
+          trator_id: "T40",
+          nome: "Sem Frota",
+          tipo_equipamento: "TRATOR",
+          status: "ATIVO",
+          empresa_id: "SILOOPS",
+          usina_id: "USINA_PADRAO",
+          unidade_id: "UNIDADE_PADRAO",
+        });
+        assert.fail("expected missing_frota validation error");
+      } catch (err) {
+        assert.equal(err?.code, "missing_frota");
+        assert.equal(err?.status, 400);
+      }
+
+      try {
+        await upsertFn({
+          trator_id: "T41",
+          nome: "Frota Duplicada",
+          frota: "602040",
+          tipo_equipamento: "TRATOR",
+          status: "ATIVO",
+          empresa_id: "SILOOPS",
+          usina_id: "USINA_PADRAO",
+          unidade_id: "UNIDADE_PADRAO",
+        });
+        assert.fail("expected duplicate_frota validation error");
+      } catch (err) {
+        assert.equal(err?.code, "duplicate_frota");
+        assert.equal(err?.status, 409);
+      }
 
       const statusRow = mergeFn(
         {
@@ -372,7 +413,7 @@ if (existsSync(storeFsPath)) {
 
       const listResponse = await listRoute.GET({});
       assert.equal(listResponse.status, 200);
-      assert.deepEqual((await listResponse.json()).map((item) => item.trator_id).sort(), ["T01", "T02"]);
+      assert.deepEqual((await listResponse.json()).map((item) => item.trator_id).sort(), ["T01"]);
     } finally {
       globalThis.fetch = originalFetch;
       rmSync(dir, { recursive: true, force: true });

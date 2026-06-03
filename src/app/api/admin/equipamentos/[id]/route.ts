@@ -89,7 +89,9 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
     return NextResponse.json({ ok: true, equipamento }, { status: 200 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro desconhecido";
-    const status = message.includes("escopo") ? 403 : message.includes("obrigatórios") ? 400 : 400;
+    const status = typeof error === "object" && error && "status" in error
+      ? Number((error as { status?: unknown }).status) || 400
+      : message.includes("escopo") ? 403 : 400;
     return NextResponse.json({ error: message }, { status });
   }
 }

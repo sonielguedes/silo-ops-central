@@ -36,7 +36,7 @@ test("mobile equipment lookup routes exist with session guard and fleet-code con
   const fleetRoute = readFileSync(new URL("../src/app/api/mobile/equipamentos/frota/[frota]/route.ts", import.meta.url), "utf8");
 
   assert.match(listRoute, /getSessionFromRequest/);
-  assert.match(listRoute, /listActiveEquipmentMaster/);
+  assert.match(listRoute, /listMobileEquipmentMaster/);
   assert.match(listRoute, /readEquipmentMasterStore/);
 
   assert.match(fleetRoute, /getSessionFromRequest/);
@@ -715,4 +715,3 @@ test("roadmap includes 3.4M as completed", () => {
   assert.match(roadmapSource, /mini-spec por fase/);
   assert.match(roadmapSource, /nao existe documento mestre longo/i);
 });
-
