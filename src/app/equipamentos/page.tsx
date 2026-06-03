@@ -321,13 +321,13 @@ export default function EquipamentosPage() {
       const payload = {
         id: values.trator_id.trim(),
         trator_id: values.trator_id.trim(),
-        frota: values.frota.trim() || null,
-        nome: values.nome.trim() || null,
-        tipo_equipamento: values.tipo_equipamento.trim() || null,
-        modelo: values.modelo.trim() || null,
-        grupo: values.grupo.trim() || null,
-        perfil: values.perfil.trim() || null,
-        status: values.status.trim() || null,
+        frota: values.frota.trim(),
+        nome: values.nome.trim(),
+        tipo_equipamento: values.tipo_equipamento.trim(),
+        modelo: values.modelo.trim(),
+        grupo: values.grupo.trim(),
+        perfil: values.perfil.trim(),
+        status: values.status.trim(),
       };
       const isEdit = modalMode === "edit";
       const url = isEdit ? `${ADMIN_ENDPOINT}/${encodeURIComponent(id)}` : ADMIN_ENDPOINT;

@@ -349,40 +349,40 @@ export function mergeEquipmentInventory(masterData: unknown, statusData: unknown
   const byId = new Map<string, Equipamento>();
   const emptySeen = new Date(0).toISOString();
 
-  const put = (item: Equipamento) => {
+  // Process status first, then master to let master overwrite metadata
+  statusList.forEach((item) => {
     const key = item.trator_id.trim();
+    if (key) byId.set(key, item);
+  });
+
+  masterList.forEach((masterItem) => {
+    const key = masterItem.trator_id.trim();
     if (!key) return;
     const existing = byId.get(key);
+
     if (!existing) {
-      byId.set(key, item);
+      byId.set(key, masterItem);
       return;
     }
 
-    const merged = mergeDefinedValues(existing as unknown as Record<string, unknown>, item as unknown as Record<string, unknown>);
-    const hasMaster = Boolean(existing.master || item.master);
+    // Merge: Master metadata should overwrite Status metadata
+    const merged = mergeDefinedValues(existing as unknown as Record<string, unknown>, masterItem as unknown as Record<string, unknown>);
+
+    const hasMaster = true;
     const hasTelemetry = Boolean(
       existing.tem_telemetria
-      || item.tem_telemetria
       || existing.last_seen !== emptySeen
-      || item.last_seen !== emptySeen
       || existing.has_coordinates
-      || item.has_coordinates,
     );
-    const cadastroStatus: NonNullable<Equipamento["cadastro_status"]> = hasMaster
-      ? (hasTelemetry ? "CADASTRADO" : "SEM_TELEMETRIA")
-      : (hasTelemetry ? "NAO_CADASTRADO" : "DESCONHECIDO");
+    const cadastroStatus: NonNullable<Equipamento["cadastro_status"]> = hasTelemetry ? "CADASTRADO" : "SEM_TELEMETRIA";
 
     byId.set(key, normalizeEquipment({
       ...merged,
       cadastro_status: cadastroStatus,
       master: hasMaster,
       tem_telemetria: hasTelemetry,
-      status: merged.status ?? (cadastroStatus === "SEM_TELEMETRIA" ? "Sem telemetria" : cadastroStatus === "NAO_CADASTRADO" ? "Não cadastrado" : "UNKNOWN"),
     }));
-  };
-
-  masterList.forEach(put);
-  statusList.forEach(put);
+  });
 
   return [...byId.values()];
 }
