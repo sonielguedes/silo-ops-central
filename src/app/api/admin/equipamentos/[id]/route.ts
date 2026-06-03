@@ -5,6 +5,7 @@ import {
   filterEquipmentMasterBySession,
   readEquipmentMasterStore,
   upsertEquipmentMaster,
+  type EquipmentMasterRecord,
   type EquipmentMasterInput,
 } from "@/lib/equipment-master-store";
 import { isAdminGlobal } from "@/lib/auth";
@@ -19,31 +20,40 @@ function canWrite(sessionRole?: string | null) {
   return sessionRole === "ADMIN_GLOBAL" || sessionRole === "ADMIN_EMPRESA";
 }
 
-function mapBody(body: Record<string, unknown>, id: string): EquipmentMasterInput {
+function readTextField(body: Record<string, unknown>, ...keys: string[]) {
+  for (const key of keys) {
+    const value = body[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+    if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  }
+  return undefined;
+}
+
+function mapBody(body: Record<string, unknown>, id: string, existing?: EquipmentMasterRecord | null): EquipmentMasterInput {
   return {
     id,
-    trator_id: typeof body.trator_id === "string" ? body.trator_id : undefined,
-    nome: typeof body.nome === "string" ? body.nome : undefined,
-    tipo_equipamento: typeof body.tipo_equipamento === "string" ? body.tipo_equipamento : undefined,
-    modelo: typeof body.modelo === "string" ? body.modelo : undefined,
-    grupo: typeof body.grupo === "string" ? body.grupo : undefined,
-    perfil: typeof body.perfil === "string" ? body.perfil : undefined,
-    placa: typeof body.placa === "string" ? body.placa : undefined,
-    frota: typeof body.frota === "string" ? body.frota : undefined,
-    fabricante: typeof body.fabricante === "string" ? body.fabricante : undefined,
-    ano: typeof body.ano === "string" || typeof body.ano === "number" ? body.ano : undefined,
-    status: typeof body.status === "string" ? body.status : undefined,
-    gera_rastro: typeof body.gera_rastro === "boolean" || typeof body.gera_rastro === "number" || typeof body.gera_rastro === "string" ? body.gera_rastro : undefined,
-    rotaciona_icone: typeof body.rotaciona_icone === "boolean" || typeof body.rotaciona_icone === "number" || typeof body.rotaciona_icone === "string" ? body.rotaciona_icone : undefined,
-    usa_horimetro: typeof body.usa_horimetro === "boolean" || typeof body.usa_horimetro === "number" || typeof body.usa_horimetro === "string" ? body.usa_horimetro : undefined,
-    usa_odometro: typeof body.usa_odometro === "boolean" || typeof body.usa_odometro === "number" || typeof body.usa_odometro === "string" ? body.usa_odometro : undefined,
-    usa_area: typeof body.usa_area === "boolean" || typeof body.usa_area === "number" || typeof body.usa_area === "string" ? body.usa_area : undefined,
-    unidade_medida: typeof body.unidade_medida === "string" ? body.unidade_medida : undefined,
-    horimetro_inicial: typeof body.horimetro_inicial === "number" || typeof body.horimetro_inicial === "string" || body.horimetro_inicial === null ? body.horimetro_inicial : undefined,
-    odometro_inicial: typeof body.odometro_inicial === "number" || typeof body.odometro_inicial === "string" || body.odometro_inicial === null ? body.odometro_inicial : undefined,
-    empresa_id: typeof body.empresa_id === "string" ? body.empresa_id : undefined,
-    usina_id: typeof body.usina_id === "string" ? body.usina_id : undefined,
-    unidade_id: typeof body.unidade_id === "string" ? body.unidade_id : undefined,
+    trator_id: readTextField(body, "trator_id") ?? existing?.trator_id,
+    nome: readTextField(body, "nome", "descricao", "descricao_equipamento") ?? existing?.nome,
+    tipo_equipamento: readTextField(body, "tipo_equipamento", "tipo") ?? existing?.tipo_equipamento,
+    modelo: readTextField(body, "modelo", "model") ?? existing?.modelo,
+    grupo: readTextField(body, "grupo", "group") ?? existing?.grupo,
+    perfil: readTextField(body, "perfil", "profile") ?? existing?.perfil,
+    placa: readTextField(body, "placa") ?? existing?.placa,
+    frota: readTextField(body, "frota", "codigo_frota", "codigo") ?? existing?.frota,
+    fabricante: readTextField(body, "fabricante", "marca") ?? existing?.fabricante,
+    ano: typeof body.ano === "string" || typeof body.ano === "number" ? body.ano : existing?.ano,
+    status: readTextField(body, "status") ?? existing?.status,
+    gera_rastro: typeof body.gera_rastro === "boolean" || typeof body.gera_rastro === "number" || typeof body.gera_rastro === "string" ? body.gera_rastro : existing?.gera_rastro,
+    rotaciona_icone: typeof body.rotaciona_icone === "boolean" || typeof body.rotaciona_icone === "number" || typeof body.rotaciona_icone === "string" ? body.rotaciona_icone : existing?.rotaciona_icone,
+    usa_horimetro: typeof body.usa_horimetro === "boolean" || typeof body.usa_horimetro === "number" || typeof body.usa_horimetro === "string" ? body.usa_horimetro : existing?.usa_horimetro,
+    usa_odometro: typeof body.usa_odometro === "boolean" || typeof body.usa_odometro === "number" || typeof body.usa_odometro === "string" ? body.usa_odometro : existing?.usa_odometro,
+    usa_area: typeof body.usa_area === "boolean" || typeof body.usa_area === "number" || typeof body.usa_area === "string" ? body.usa_area : existing?.usa_area,
+    unidade_medida: readTextField(body, "unidade_medida") ?? existing?.unidade_medida,
+    horimetro_inicial: typeof body.horimetro_inicial === "number" || typeof body.horimetro_inicial === "string" || body.horimetro_inicial === null ? body.horimetro_inicial : existing?.horimetro_inicial,
+    odometro_inicial: typeof body.odometro_inicial === "number" || typeof body.odometro_inicial === "string" || body.odometro_inicial === null ? body.odometro_inicial : existing?.odometro_inicial,
+    empresa_id: readTextField(body, "empresa_id") ?? existing?.empresa_id,
+    usina_id: readTextField(body, "usina_id") ?? existing?.usina_id,
+    unidade_id: readTextField(body, "unidade_id") ?? existing?.unidade_id,
   };
 }
 
@@ -75,7 +85,7 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
   try {
     const store = await readEquipmentMasterStore();
     const existing = getEquipmentMasterById(store.items, id);
-    const equipamento = await upsertEquipmentMaster(mapBody(body, existing?.id || id), session);
+    const equipamento = await upsertEquipmentMaster(mapBody(body, existing?.id || id, existing), session);
     return NextResponse.json({ ok: true, equipamento }, { status: 200 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro desconhecido";

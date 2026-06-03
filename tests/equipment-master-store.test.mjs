@@ -23,7 +23,7 @@ function transpileTs(source) {
   }).outputText;
 }
 
-function loadStoreModule(jsonPath) {
+function buildStoreModuleUrl(jsonPath) {
   const authShim = `
     export function isAdminGlobal(profile) {
       return profile?.role === "ADMIN_GLOBAL";
@@ -40,8 +40,73 @@ function loadStoreModule(jsonPath) {
   const storeUrl = `data:text/javascript;base64,${Buffer.from(transpileTs(storeSource)).toString("base64")}`;
 
   process.env.EQUIPMENT_MASTER_STORE_PATH = jsonPath;
-  const url = `${storeUrl}#${Buffer.from(jsonPath).toString("base64")}`;
-  return import(url);
+  return `${storeUrl}#${Buffer.from(jsonPath).toString("base64")}`;
+}
+
+async function loadStoreModule(jsonPath) {
+  return import(buildStoreModuleUrl(jsonPath));
+}
+
+async function loadDetailsModule(jsonPath) {
+  const storeModuleUrl = buildStoreModuleUrl(jsonPath);
+  const detailsSource = readFileSync(new URL("../src/lib/equipment-details.ts", import.meta.url), "utf8")
+    .replace(/from "@\/lib\/app-env"/g, `from "data:text/javascript;base64,${Buffer.from(transpileTs(`
+      export const IS_DEMO = false;
+      export const SITE_URL = "";
+    `)).toString("base64")}"`)
+    .replace(/from "@\/lib\/api"/g, `from "data:text/javascript;base64,${Buffer.from(transpileTs(`
+      export function normalizeEquipmentList(data) {
+        return Array.isArray(data) ? data : [];
+      }
+    `)).toString("base64")}"`)
+    .replace(/from "@\/lib\/auth"/g, `from "data:text/javascript;base64,${Buffer.from(transpileTs(`
+      export function filterItemsBySessionScope(rows) { return rows; }
+      export function normalizeScopeFields(scope) { return scope; }
+    `)).toString("base64")}"`)
+    .replace(/from "@\/lib\/equipment-master-store"/g, `from "${storeModuleUrl}"`)
+    .replace(/from "@\/lib\/equipment-status-trail"/g, `from "data:text/javascript;base64,${Buffer.from(transpileTs(`
+      export async function fetchEquipmentStatusSnapshot() {
+        return {
+          data: [
+            {
+              trator_id: "T01",
+              status: "ONLINE",
+              presence: "ONLINE",
+              updated_at: "2026-06-03T10:00:00.000Z",
+            },
+          ],
+        };
+      }
+      export function enrichTrailPointWithOperationalContext(point) {
+        return point;
+      }
+    `)).toString("base64")}"`)
+    .replace(/from "@\/lib\/equipment-state"/g, `from "data:text/javascript;base64,${Buffer.from(transpileTs(`
+      export function normalizeEquipmentState(input) {
+        return {
+          presence: input.presence ?? null,
+          estado_operacional: input.estado_operacional ?? null,
+          codigo_parada: input.codigo_parada ?? null,
+          descricao_parada: input.descricao_parada ?? null,
+          operacao_atual: input.operacao_nome ?? null,
+          ultima_operacao_conhecida: input.operacao_nome ?? null,
+          status_resumo: input.status ?? null,
+        };
+      }
+    `)).toString("base64")}"`)
+    .replace(/from "@\/lib\/equipment-trail-store"/g, `from "data:text/javascript;base64,${Buffer.from(transpileTs(`
+      export async function queryEquipmentTrailPoints() {
+        return [];
+      }
+    `)).toString("base64")}"`)
+    .replace(/from "@\/lib\/equipment-type"/g, `from "data:text/javascript;base64,${Buffer.from(transpileTs(`
+      export function normalizeEquipmentType(input) {
+        return input.tipo_equipamento || input.tipo || "TRATOR";
+      }
+    `)).toString("base64")}"`);
+
+  const detailsUrl = `data:text/javascript;base64,${Buffer.from(transpileTs(detailsSource)).toString("base64")}`;
+  return import(`${detailsUrl}#${Buffer.from(jsonPath).toString("base64")}`);
 }
 
 test("equipment master registry docs expose the planned store and admin API contract", () => {
@@ -172,6 +237,73 @@ if (existsSync(storeFsPath)) {
       assert.match(raw, /T99/);
       assert.match(raw, /SILOOPS/);
     } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+}
+
+if (existsSync(storeFsPath)) {
+  test("equipment master update propagates to status and detalhes payloads", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "silo-equipment-details-"));
+    const jsonPath = join(dir, "equipment-master.json");
+    const originalFetch = globalThis.fetch;
+
+    try {
+      globalThis.fetch = async (input) => {
+        const url = String(input);
+        const body = url.includes("/api/equipamentos/status")
+          ? [{
+              trator_id: "T01",
+              status: "ONLINE",
+              presence: "ONLINE",
+              updated_at: "2026-06-03T10:00:00.000Z",
+            }]
+          : [];
+        return new Response(JSON.stringify(body), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      };
+
+      const storeMod = await loadStoreModule(jsonPath);
+      const upsertFn = storeMod.upsertEquipmentMaster ?? storeMod.upsertEquipment ?? storeMod.upsertItem;
+      const readFn = storeMod.readEquipmentMasterStore ?? storeMod.readEquipmentStore ?? storeMod.readStore;
+      const mergeFn = storeMod.enrichEquipmentStatusWithMaster ?? storeMod.mergeEquipmentMasterStatus;
+
+      await upsertFn({
+        id: "T01",
+        trator_id: "T01",
+        nome: "TR PREPARO",
+        frota: "602040",
+        tipo_equipamento: "TRATOR",
+        empresa_id: "SILOOPS",
+        usina_id: "USINA_PADRAO",
+        unidade_id: "UNIDADE_PADRAO",
+      });
+
+      const store = await readFn();
+      const master = store.items.find((item) => item.trator_id === "T01");
+      assert.equal(master?.frota, "602040");
+      assert.equal(master?.nome, "TR PREPARO");
+
+      const statusRow = mergeFn(
+        {
+          trator_id: "T01",
+          status: "ONLINE",
+          presence: "ONLINE",
+          cadastro_status: "NAO_CADASTRADO",
+        },
+        master,
+      );
+      assert.equal(statusRow.frota, "602040");
+      assert.equal(statusRow.nome, "TR PREPARO");
+
+      const detailsMod = await loadDetailsModule(jsonPath);
+      const details = await detailsMod.buildEquipmentDetails("T01", { role: "ADMIN_GLOBAL", empresa_id: "SILOOPS", usinas: ["*"], unidades: ["*"] });
+      assert.equal(details?.frota, "602040");
+      assert.equal(details?.nome_equipamento, "TR PREPARO");
+    } finally {
+      globalThis.fetch = originalFetch;
       rmSync(dir, { recursive: true, force: true });
     }
   });

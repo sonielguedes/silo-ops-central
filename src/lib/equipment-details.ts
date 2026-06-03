@@ -11,6 +11,7 @@ const BASE = (process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL |
 
 export type EquipmentDetails = {
   trator_id: string;
+  frota: string | null;
   nome_equipamento: string | null;
   tipo_equipamento: EquipmentType;
   cadastro_status: "CADASTRADO" | "SEM_TELEMETRIA" | "NAO_CADASTRADO" | "DESCONHECIDO" | null;
@@ -42,6 +43,7 @@ export type EquipmentDetails = {
 
 type NormalizedStatus = Record<string, unknown> & {
   trator_id: string;
+  frota?: string | null;
   tipo_equipamento?: string | null;
   nome?: string | null;
   modelo?: string | null;
@@ -138,6 +140,7 @@ function normalizeStatusItem(item: Record<string, unknown>): NormalizedStatus {
       unidade_id: text(item.unidade_id) || undefined,
     }),
     trator_id: text(item.trator_id ?? item.id ?? item.equipamento_id) || "",
+    frota: text(item.frota),
     tipo_equipamento: text(item.tipo_equipamento ?? item.tipo ?? item.category ?? item.categoria_equipamento),
     nome: text(item.nome ?? item.name ?? item.apelido),
     modelo: text(item.modelo ?? item.model ?? item.modelo_equipamento),
@@ -291,6 +294,7 @@ export async function buildEquipmentDetails(tratorId: string, session: SessionPa
   const statusBase = statusItem ? enrichEquipmentStatusWithMaster(statusItem, master) : null;
   const base = statusBase || (master ? {
     trator_id: master.trator_id,
+    frota: master.frota,
     nome: master.nome,
     tipo_equipamento: master.tipo_equipamento,
     modelo: master.modelo,
@@ -365,6 +369,7 @@ export async function buildEquipmentDetails(tratorId: string, session: SessionPa
 
   const rawDetails = {
     trator_id: tratorId,
+    frota: text(base.frota ?? master?.frota ?? null),
     nome_equipamento: text(base.nome ?? base.modelo ?? base.descricao ?? (cadastroStatus === "NAO_CADASTRADO" ? "Não cadastrado" : cadastroStatus === "SEM_TELEMETRIA" ? "Sem telemetria" : tratorId)),
     tipo_equipamento: type,
     cadastro_status: cadastroStatus,
@@ -416,5 +421,6 @@ export async function buildEquipmentDetails(tratorId: string, session: SessionPa
     ultima_operacao_conhecida: normalized.ultima_operacao_conhecida,
     status_resumo: normalized.status_resumo,
     cadastro_status: cadastroStatus,
+    frota: rawDetails.frota,
   };
 }
