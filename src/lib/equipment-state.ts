@@ -125,7 +125,33 @@ function hasActiveStop(input: EquipmentStateInput): boolean {
  * Retorna o label da operação — pode ser operacao_nome, status legado, ou evento_status.
  */
 function resolveOperationLabel(input: EquipmentStateInput): string | null {
-  return txt(input.operacao_nome) || txt(input.status) || txt(input.evento_status) || null;
+  const operationName = txt(input.operacao_nome);
+  if (operationName) return operationName;
+
+  const rawStatus = txt(input.status);
+  if (rawStatus) {
+    const normalized = rawStatus.toUpperCase();
+    const technicalStatus = [
+      "ONLINE",
+      "INSTAVEL",
+      "OFFLINE",
+      "ATIVO",
+      "INATIVO",
+      "MANUTENCAO",
+      "BLOQUEADO",
+      "RASCUNHO",
+      "CADASTRADO",
+      "NAO_CADASTRADO",
+      "SEM_TELEMETRIA",
+      "DESCONHECIDO",
+      "UNKNOWN",
+    ];
+    if (!technicalStatus.includes(normalized)) {
+      return rawStatus;
+    }
+  }
+
+  return txt(input.evento_status) || null;
 }
 
 /**

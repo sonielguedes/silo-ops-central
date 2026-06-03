@@ -41,7 +41,6 @@ function badgeVariantFromVisual(key: string): "offline" | "instavel" | "erro" | 
 }
 
 function badgeVariantFromCadastro(status?: string | null): "offline" | "info" {
-  if (status === "SEM_TELEMETRIA") return "offline";
   return "info";
 }
 
@@ -128,8 +127,13 @@ export default function EquipmentDetailsDrawer({ tratorId, open, onClose }: Prop
                 <Badge label={equipmentType ? getEquipmentTypeDisplay(equipmentType) : "--"} variant="info" dot={false} />
                 <Badge label={visual.label} variant={badgeVariantFromVisual(visual.key)} />
                 <Badge
-                  label={cadastroStatus === "SEM_TELEMETRIA" ? "Sem telemetria" : cadastroStatus === "NAO_CADASTRADO" ? "Não cadastrado" : cadastroStatus === "CADASTRADO" ? "Cadastrado" : "Desconhecido"}
+                  label={cadastroStatus === "NAO_CADASTRADO" ? "Não cadastrado" : cadastroStatus === "CADASTRADO" ? "Cadastrado" : "Desconhecido"}
                   variant={badgeVariantFromCadastro(cadastroStatus)}
+                  dot={false}
+                />
+                <Badge
+                  label={data?.tem_telemetria ? "Com telemetria" : "Sem telemetria"}
+                  variant={data?.tem_telemetria ? "online" : "offline"}
                   dot={false}
                 />
               </div>

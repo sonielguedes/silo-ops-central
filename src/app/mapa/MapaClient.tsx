@@ -85,6 +85,7 @@ export default function MapaClient() {
   const offlineCount = equip.filter((e) => resolvedPresence(e) === "OFFLINE").length;
   const filteredComGPS = comGPS.filter((e) => !fPresence || resolvedPresence(e) === fPresence);
   const filteredSemGPS = semGPS.filter((item) => !fPresence || resolvedPresence(item.eq) === fPresence);
+  const semLocalizacaoReason = "Sem última localização recebida";
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
@@ -150,7 +151,37 @@ export default function MapaClient() {
               </div>
             </div>
 
-            {filteredSemGPS.length > 0 ? <div className="card-p space-y-2"><h3 className="text-white font-bold">Sem coordenadas</h3>{filteredSemGPS.map((item) => <div key={item.eq.trator_id} className="text-xs text-[#4a6a8a]">{item.eq.trator_id} - {item.coord.reason}</div>)}</div> : <Empty title="Nenhum equipamento sem GPS" sub="Todos os equipamentos visiveis possuem coordenadas validas." />}
+            {filteredSemGPS.length > 0 ? (
+              <div className="card-p space-y-3">
+                <h3 className="text-white font-bold">Sem localização</h3>
+                {filteredSemGPS.map((item) => (
+                  <button
+                    key={item.eq.trator_id}
+                    type="button"
+                    onClick={() => setSelectedId((prev) => (prev === item.eq.trator_id ? null : item.eq.trator_id))}
+                    className="w-full rounded-2xl border border-[#1e2d3d] bg-[#0d1420] p-3 text-left transition-colors hover:border-[#00d4ff]/35 hover:bg-[#111c2a]"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-black text-white">{item.eq.frota || item.eq.trator_id} · {item.eq.nome || item.eq.descricao || "Sem descrição"}</p>
+                        <p className="mt-1 text-[11px] font-mono uppercase tracking-[0.18em] text-[#4a6a8a]">ID técnico: {item.eq.trator_id}</p>
+                      </div>
+                      <span className="rounded-full border border-[#1f334d] px-2 py-1 text-[10px] font-black uppercase tracking-widest text-[#ffb3bc]">
+                        {item.eq.cadastro_status || "DESCONHECIDO"}
+                      </span>
+                    </div>
+                    <div className="mt-3 grid gap-1 text-[11px] text-[#c8d8e8]">
+                      <div><span className="text-[#4a6a8a]">Tipo:</span> {item.eq.tipo_equipamento || "--"}</div>
+                      <div><span className="text-[#4a6a8a]">Grupo:</span> {item.eq.grupo || "--"}</div>
+                      <div><span className="text-[#4a6a8a]">Status cadastral:</span> {item.eq.cadastro_status || "DESCONHECIDO"}</div>
+                      <div><span className="text-[#4a6a8a]">Motivo:</span> {semLocalizacaoReason}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <Empty title="Nenhum equipamento sem GPS" sub="Todos os equipamentos visiveis possuem coordenadas validas." />
+            )}
           </div>
         </div>
       </main>

@@ -19,10 +19,15 @@ export interface Equipamento {
   modelo?: string | null;
   descricao?: string | null;
   tipo_equipamento?: string | null;
+  grupo?: string | null;
+  perfil?: string | null;
   frota?: string | null;
   cadastro_status?: "CADASTRADO" | "SEM_TELEMETRIA" | "NAO_CADASTRADO" | "DESCONHECIDO" | null;
   tem_telemetria?: boolean | null;
   master?: boolean | null;
+  empresa_id?: string | null;
+  usina_id?: string | null;
+  unidade_id?: string | null;
   estado_operacional?: string | null;
   operacao_id?: string | null;
   operacao_nome?: string | null;
@@ -86,6 +91,7 @@ export interface EquipmentDetails {
   tipo_equipamento: string;
   frota?: string | null;
   cadastro_status?: "CADASTRADO" | "SEM_TELEMETRIA" | "NAO_CADASTRADO" | "DESCONHECIDO" | null;
+  tem_telemetria?: boolean | null;
   presence: string | null;
   status: string | null;
   estado_operacional: string | null;
@@ -263,7 +269,7 @@ export function normalizeEquipment(item: Record<string, unknown>): Equipamento {
     item.status
     ?? item.operacao_atual
     ?? item.operacao
-    ?? (cadastroStatus === "SEM_TELEMETRIA" ? "Sem telemetria" : cadastroStatus === "NAO_CADASTRADO" ? "Não cadastrado" : "UNKNOWN"),
+    ?? (cadastroStatus === "NAO_CADASTRADO" ? "Não cadastrado" : "UNKNOWN"),
   );
   const presence = String(item.presence ?? item.presenca ?? item.presenca_operacional ?? item.status_presenca ?? "OFFLINE");
   const lastSeen = String(item.last_seen ?? item.timestamp ?? item.updated_at ?? item.ultima_atualizacao ?? new Date(0).toISOString());
@@ -330,7 +336,7 @@ export function normalizeEquipmentList(data: unknown): Equipamento[] {
       const hasMaster = scoreMasterShape(group.master || merged) > 0;
       const hasTelemetry = scoreTelemetryShape(group.live || merged) > 0;
       const cadastroStatus: NonNullable<Equipamento["cadastro_status"]> = hasMaster
-        ? (hasTelemetry ? "CADASTRADO" : "SEM_TELEMETRIA")
+        ? "CADASTRADO"
         : (hasTelemetry ? "NAO_CADASTRADO" : "DESCONHECIDO");
 
       return normalizeEquipment({
@@ -338,7 +344,9 @@ export function normalizeEquipmentList(data: unknown): Equipamento[] {
         cadastro_status: cadastroStatus,
         tem_telemetria: hasTelemetry,
         master: hasMaster,
-        status: merged.status ?? (cadastroStatus === "SEM_TELEMETRIA" ? "Sem telemetria" : cadastroStatus === "NAO_CADASTRADO" ? "Não cadastrado" : "UNKNOWN"),
+        status: hasTelemetry
+          ? (merged.status ?? (cadastroStatus === "NAO_CADASTRADO" ? "Não cadastrado" : "UNKNOWN"))
+          : "OFFLINE",
       });
     });
 }
@@ -374,13 +382,16 @@ export function mergeEquipmentInventory(masterData: unknown, statusData: unknown
       || existing.last_seen !== emptySeen
       || existing.has_coordinates
     );
-    const cadastroStatus: NonNullable<Equipamento["cadastro_status"]> = hasTelemetry ? "CADASTRADO" : "SEM_TELEMETRIA";
+    const cadastroStatus: NonNullable<Equipamento["cadastro_status"]> = existing.cadastro_status === "CADASTRADO" || masterItem.cadastro_status === "CADASTRADO"
+      ? "CADASTRADO"
+      : (hasTelemetry ? "NAO_CADASTRADO" : "DESCONHECIDO");
 
     byId.set(key, normalizeEquipment({
       ...merged,
       cadastro_status: cadastroStatus,
       master: hasMaster,
       tem_telemetria: hasTelemetry,
+      status: existing.status ?? merged.status ?? (hasTelemetry ? "UNKNOWN" : "OFFLINE"),
     }));
   });
 
@@ -560,7 +571,3 @@ export function fmtDur(secs: number | null | undefined, isoStart?: string): stri
   if (!s || s < 0) return "--";
   return `${String(Math.floor(s/3600)).padStart(2,"0")}:${String(Math.floor((s%3600)/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`;
 }
-
-
-
-

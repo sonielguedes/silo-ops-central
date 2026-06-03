@@ -15,6 +15,7 @@ export type EquipmentDetails = {
   nome_equipamento: string | null;
   tipo_equipamento: EquipmentType;
   cadastro_status: "CADASTRADO" | "SEM_TELEMETRIA" | "NAO_CADASTRADO" | "DESCONHECIDO" | null;
+  tem_telemetria?: boolean | null;
   presence: string | null;
   status: string | null;
   estado_operacional: string | null;
@@ -280,7 +281,8 @@ export async function buildEquipmentDetails(tratorId: string, session: SessionPa
     usina_id: statusItem?.usina_id as string | undefined,
     unidade_id: statusItem?.unidade_id as string | undefined,
   }, session || null);
-  const cadastroStatus = master ? (statusItem ? "CADASTRADO" : "SEM_TELEMETRIA") : ((statusItem?.cadastro_status as EquipmentDetails["cadastro_status"]) || (statusItem ? "NAO_CADASTRADO" : "DESCONHECIDO"));
+  const temTelemetria = Boolean(statusItem?.tem_telemetria ?? statusItem);
+  const cadastroStatus = master ? "CADASTRADO" : ((statusItem?.cadastro_status as EquipmentDetails["cadastro_status"]) || (statusItem ? "NAO_CADASTRADO" : "DESCONHECIDO"));
   const opItem = applyScope(operacoes.filter((item) => item.trator_id === tratorId), session);
   const eventItems = applyScope([...eventos, ...recentes].filter((item) => item.trator_id === tratorId || item.operacao_id === statusItem?.operacao_id), session);
   const trailItem = trail.length > 0 ? enrichTrailPointWithOperationalContext(trail[trail.length - 1]) : null;
@@ -291,7 +293,7 @@ export async function buildEquipmentDetails(tratorId: string, session: SessionPa
 
   const op = latestByTimestamp(opItem);
   const event = latestByTimestamp(eventItems);
-  const statusBase = statusItem ? enrichEquipmentStatusWithMaster(statusItem, master) : null;
+  const statusBase = statusItem ? enrichEquipmentStatusWithMaster(statusItem, master, temTelemetria) : null;
   const base = statusBase || (master ? {
     trator_id: master.trator_id,
     frota: master.frota,
@@ -300,8 +302,8 @@ export async function buildEquipmentDetails(tratorId: string, session: SessionPa
     modelo: master.modelo,
     grupo: master.grupo,
     perfil: master.perfil,
-    status: master.status,
-    presence: null,
+    status: "OFFLINE",
+    presence: "OFFLINE",
     estado_operacional: null,
     operacao_id: null,
     operacao_nome: null,
@@ -318,10 +320,11 @@ export async function buildEquipmentDetails(tratorId: string, session: SessionPa
     frente: null,
     talhao: null,
     zona: null,
-    updated_at: master.updated_at,
+    updated_at: null,
     evento_status: null,
     motivo_status: null,
-    cadastro_status: "SEM_TELEMETRIA",
+    cadastro_status: "CADASTRADO",
+    tem_telemetria: false,
     empresa_id: master.empresa_id,
     usina_id: master.usina_id,
     unidade_id: master.unidade_id,
@@ -370,11 +373,14 @@ export async function buildEquipmentDetails(tratorId: string, session: SessionPa
   const rawDetails = {
     trator_id: tratorId,
     frota: text(base.frota ?? master?.frota ?? null),
-    nome_equipamento: text(base.nome ?? base.modelo ?? base.descricao ?? (cadastroStatus === "NAO_CADASTRADO" ? "Não cadastrado" : cadastroStatus === "SEM_TELEMETRIA" ? "Sem telemetria" : tratorId)),
+    nome_equipamento: text(base.nome ?? base.modelo ?? base.descricao ?? (cadastroStatus === "NAO_CADASTRADO" ? "Não cadastrado" : tratorId)),
     tipo_equipamento: type,
     cadastro_status: cadastroStatus,
+    tem_telemetria: master
+      ? temTelemetria
+      : (typeof statusItem?.tem_telemetria === "boolean" ? statusItem.tem_telemetria : null),
     presence: base.presence || null,
-    status: base.status || op?.status || (cadastroStatus === "SEM_TELEMETRIA" ? "Sem telemetria" : cadastroStatus === "NAO_CADASTRADO" ? "Não cadastrado" : null),
+    status: base.status || op?.status || (cadastroStatus === "NAO_CADASTRADO" ? "Não cadastrado" : null),
     estado_operacional: trailItem?.estado_operacional || base.estado_operacional || null,
     operacao_id: op?.operacao_id || base.operacao_id || event?.operacao_id || null,
     operacao_nome: op?.operacao_atual || op?.status || base.operacao_nome || null,
@@ -383,7 +389,7 @@ export async function buildEquipmentDetails(tratorId: string, session: SessionPa
     descricao_parada: trailItem?.descricao_parada || base.descricao_parada || event?.descricao_parada || null,
     velocidade: trailItem?.velocidade ?? op?.velocidade_atual ?? base.velocidade ?? null,
     operador: op?.nome_operador || base.operador || null,
-    comunicacao: base.comunicacao || (base.presence ? `Presença ${base.presence}` : cadastroStatus === "SEM_TELEMETRIA" ? "Sem telemetria" : cadastroStatus === "NAO_CADASTRADO" ? "Não cadastrado" : null),
+    comunicacao: base.comunicacao || (base.presence ? `Presença ${base.presence}` : (temTelemetria ? null : "Sem telemetria")),
     latitude: trailItem?.latitude ?? base.latitude ?? null,
     longitude: trailItem?.longitude ?? base.longitude ?? null,
     bateria: op?.bateria ?? base.bateria ?? null,

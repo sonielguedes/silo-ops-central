@@ -203,10 +203,16 @@ test("map page only renders markers for valid coordinates and lists the reason f
   const mapaSource = readFileSync(new URL("../src/app/mapa/MapaClient.tsx", import.meta.url), "utf8");
   const mapComponentSource = readFileSync(new URL("../src/components/MapComponent.tsx", import.meta.url), "utf8");
   const drawerSource = readFileSync(new URL("../src/components/EquipmentDetailsDrawer.tsx", import.meta.url), "utf8");
+  const statusRouteSource = readFileSync(new URL("../src/app/api/equipamentos/status/route.ts", import.meta.url), "utf8");
+  const detailsSource = readFileSync(new URL("../src/lib/equipment-details.ts", import.meta.url), "utf8");
 
   assert.match(mapaSource, /resolveEquipmentCoordinates/);
   assert.match(mapaSource, /coord\.hasCoordinates/);
-  assert.match(mapaSource, /coord\.reason/);
+  assert.match(mapaSource, /Sem localização/);
+  assert.match(mapaSource, /Sem última localização recebida/);
+  assert.match(mapaSource, /ID técnico:/);
+  assert.match(mapaSource, /Status cadastral:/);
+  assert.match(mapaSource, /Motivo:/);
   assert.match(mapaSource, /xl:grid-cols-\[minmax\(0,1fr\)_440px\]/);
   assert.match(mapaSource, /drawerOpen=\{isDrawerOpen\}/);
   assert.match(mapComponentSource, /drawerOpen\?: boolean/);
@@ -214,6 +220,12 @@ test("map page only renders markers for valid coordinates and lists the reason f
   assert.match(mapComponentSource, /setView\(pos, Math\.max\(map\.getZoom\(\), 18\)/);
   assert.match(drawerSource, /fixed inset-x-0 bottom-0/);
   assert.match(drawerSource, /xl:static xl:inset-auto/);
+  assert.match(drawerSource, /Com telemetria|Sem telemetria/);
+  assert.match(statusRouteSource, /coord_reason:\s*"missing"/);
+  assert.match(statusRouteSource, /tem_telemetria:\s*false/);
+  assert.match(statusRouteSource, /cadastro_status:\s*"CADASTRADO"/);
+  assert.match(detailsSource, /tem_telemetria/);
+  assert.doesNotMatch(statusRouteSource, /SEM_TELEMETRIA/);
 });
 
 test("equipment list exposes direct trail navigation on each row", () => {

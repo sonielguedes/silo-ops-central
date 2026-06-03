@@ -370,12 +370,15 @@ export function listMobileEquipmentMaster(items: EquipmentMasterRecord[], sessio
   return listAccessibleEquipmentMaster(items, session || null).filter((item) => item.status === "ATIVO" && hasText(item.frota) && hasText(item.tipo_equipamento));
 }
 
-export function enrichEquipmentStatusWithMaster<T extends Record<string, unknown>>(statusItem: T, master: EquipmentMasterRecord | null) {
+export function enrichEquipmentStatusWithMaster<T extends Record<string, unknown>>(statusItem: T, master: EquipmentMasterRecord | null, hasTelemetry = true) {
   if (!master) {
     return {
       ...statusItem,
       master: typeof (statusItem as { master?: unknown }).master === "boolean" ? (statusItem as { master?: boolean }).master : false,
       cadastro_status: (statusItem as { cadastro_status?: unknown }).cadastro_status || "NAO_CADASTRADO",
+      tem_telemetria: typeof (statusItem as { tem_telemetria?: unknown }).tem_telemetria === "boolean"
+        ? (statusItem as { tem_telemetria?: boolean }).tem_telemetria
+        : null,
     };
   }
 
@@ -388,12 +391,11 @@ export function enrichEquipmentStatusWithMaster<T extends Record<string, unknown
     modelo: master.modelo,
     grupo: master.grupo,
     perfil: master.perfil,
-    status: master.status,
     empresa_id: master.empresa_id,
     usina_id: master.usina_id,
     unidade_id: master.unidade_id,
     master: true,
-    tem_telemetria: true,
+    tem_telemetria: hasTelemetry,
     cadastro_status: "CADASTRADO",
   };
 }
