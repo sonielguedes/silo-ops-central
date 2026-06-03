@@ -662,6 +662,21 @@ test("drawer shows separated blocks for presence, operational state and last ope
   assert.match(drawerSource, /Tentar novamente/);
 });
 
+test("operation and stop code registries expose shared store and admin api contract", () => {
+  assert.equal(existsSync(new URL("../src/lib/operation-registry-store.ts", import.meta.url)), true);
+  const operacoesRoute = readFileSync(new URL("../src/app/api/admin/operacoes-cadastro/route.ts", import.meta.url), "utf8");
+  const paradasRoute = readFileSync(new URL("../src/app/api/admin/codigos-parada/route.ts", import.meta.url), "utf8");
+  const operacoesPage = readFileSync(new URL("../src/app/cadastros/operacoes/page.tsx", import.meta.url), "utf8");
+  const paradasPage = readFileSync(new URL("../src/app/cadastros/codigos-parada/page.tsx", import.meta.url), "utf8");
+
+  assert.match(operacoesRoute, /readOperationRegistryStore/);
+  assert.match(operacoesRoute, /upsertOperacao/);
+  assert.match(paradasRoute, /readOperationRegistryStore/);
+  assert.match(paradasRoute, /upsertParada/);
+  assert.match(operacoesPage, /\/api\/admin\/operacoes-cadastro/);
+  assert.match(paradasPage, /\/api\/admin\/codigos-parada/);
+});
+
 test("roadmap includes 3.4M as completed", () => {
   const roadmapSource = readFileSync(new URL("../docs/specs/roadmap.md", import.meta.url), "utf8");
 

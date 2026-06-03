@@ -7,18 +7,16 @@
 
 ## Comandos
 ```bash
-npm install
-npm run build
-docker compose up -d --build
-docker compose logs -f central-web
+cd /opt/silo-ops-central
+chmod +x deploy.sh
+./deploy.sh
 ```
 
 ## Fluxo recomendado
 1. Copie `.env.production.example` para `.env.production`
 2. Ajuste URL da API, MQTT e `NEXT_PUBLIC_SITE_URL`
-3. Rode `npm run build` localmente
-4. Suba o container com `docker compose up -d --build`
-5. Aponte o Nginx do arquivo `nginx.app.siloops.com.br.conf.example` para `127.0.0.1:3000`
+3. Rode `./deploy.sh`
+4. Aponte o Nginx do arquivo `nginx.app.siloops.com.br.conf.example` para `silo-ops-central_central-web_1:3000`
 
 ## Checklist antes de publicar
 - `node --test tests/api-endpoints.test.mjs` passou

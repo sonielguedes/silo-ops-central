@@ -1,0 +1,53 @@
+import { NextRequest, NextResponse } from "next/server";
+import { forbidden, readJsonBody, requireSession, unauthorized } from "../../_helpers";
+import { readOperationRegistryStore, upsertParada } from "@/lib/operation-registry-store";
+import { filterItemsBySessionScope, isAdminGlobal } from "@/lib/auth";
+
+export const runtime = "nodejs";
+
+export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+  const session = requireSession(req);
+  if (!session) return unauthorized();
+
+  const store = await readOperationRegistryStore();
+  const item = store.paradas.find(it => it.id === params.id);
+
+  if (!item) return NextResponse.json({ error: "not_found" }, { status: 404 });
+
+  const filtered = filterItemsBySessionScope([item], session);
+  if (filtered.length === 0) return forbidden();
+
+  return NextResponse.json(item, { status: 200 });
+}
+
+export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+  const session = requireSession(req);
+  if (!session) return unauthorized();
+
+  const isAuthorized = isAdminGlobal(session) || session.role === "ADMIN_EMPRESA";
+  if (!isAuthorized) return forbidden();
+
+  const body = await readJsonBody(req);
+  if (!body) return NextResponse.json({ error: "invalid_payload" }, { status: 400 });
+
+  const store = await readOperationRegistryStore();
+  const existing = store.paradas.find(it => it.id === params.id);
+  if (!existing) return NextResponse.json({ error: "not_found" }, { status: 404 });
+
+  // Tenant check
+  if (!isAdminGlobal(session) && existing.empresa_id !== session.empresa_id) {
+    return forbidden();
+  }
+
+  try {
+    const item = await upsertParada({
+      ...body,
+      id: params.id,
+      empresa_id: existing.empresa_id,
+    });
+    return NextResponse.json({ ok: true, item }, { status: 200 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Erro desconhecido";
+    return NextResponse.json({ error: message }, { status: 400 });
+  }
+}
