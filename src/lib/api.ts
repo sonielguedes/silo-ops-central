@@ -15,7 +15,25 @@ export interface Equipamento {
   trator_id: string; status: string; presence: string;
   last_seen: string; bateria: number | null; latitude: number | null;
   longitude: number | null; velocidade: number | null; app_version: string | null;
+  nome?: string | null;
+  modelo?: string | null;
+  descricao?: string | null;
+  tipo_equipamento?: string | null;
   estado_operacional?: string | null;
+  operacao_id?: string | null;
+  operacao_nome?: string | null;
+  descricao_operacao?: string | null;
+  codigo_parada?: string | null;
+  descricao_parada?: string | null;
+  operador?: string | null;
+  comunicacao?: string | null;
+  fazenda?: string | null;
+  frente?: string | null;
+  talhao?: string | null;
+  zona?: string | null;
+  updated_at?: string | null;
+  evento_status?: string | null;
+  motivo_status?: string | null;
   gps_source?: string | null;
   lat?: number | null;
   lng?: number | null;
@@ -56,6 +74,33 @@ export interface OutboxItem {
   status: "PENDENTE" | "ENVIADO" | "ERRO";
   ultimo_erro?: string;
   timestamp: string;
+}
+
+export interface EquipmentDetails {
+  trator_id: string;
+  nome_equipamento: string | null;
+  tipo_equipamento: string;
+  presence: string | null;
+  status: string | null;
+  estado_operacional: string | null;
+  operacao_id: string | null;
+  operacao_nome: string | null;
+  descricao_operacao: string | null;
+  codigo_parada: string | null;
+  descricao_parada: string | null;
+  velocidade: number | null;
+  operador: string | null;
+  comunicacao: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  bateria: number | null;
+  fazenda: string | null;
+  frente: string | null;
+  talhao: string | null;
+  zona: string | null;
+  updated_at: string | null;
+  evento_status: string | null;
+  motivo_status: string | null;
 }
 
 export type ApiResult<T> = { ok: true; data: T } | { ok: false; error: string };
@@ -261,6 +306,7 @@ export const api = {
   operacoesAtivas: () => fetchResult<OperacaoAtiva[]>("/api/operacoes/ativas"),
   eventosRecentes: () => fetchResult<EventoOperacional[]>("/api/eventos/recentes"),
   rastro: (tratorId: string, limit = 500) => fetchResult<GpsPoint[]>(`/api/equipamentos/${tratorId}/rastro?limit=${limit}`),
+  equipamentoDetalhes: (tratorId: string) => fetchResult<EquipmentDetails>(`/api/equipamentos/${tratorId}/detalhes`),
   outbox: () => fetchResult<OutboxItem[]>("/api/outbox/queue"),
 };
 

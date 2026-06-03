@@ -8,6 +8,7 @@ import { api, type Equipamento } from "@/lib/api";
 import {
   ALL_ICONS,
   getIconForModel,
+  getEquipmentType,
   readIconConfig,
   renderEquipmentIconSvg,
   saveIconConfig,
@@ -40,9 +41,7 @@ export default function EquipmentIconsPage() {
   const models = useMemo(() => {
     const byModel = new Map<string, Equipamento[]>();
     equip.forEach(eq => {
-      const id = (eq.trator_id || "").toUpperCase();
-      const prefixMatch = id.match(/^[A-Z]+/);
-      const model = prefixMatch ? prefixMatch[0] : "OUTROS";
+      const model = getEquipmentType(eq);
       byModel.set(model, [...(byModel.get(model) || []), eq]);
     });
     return Array.from(byModel.entries()).sort(([a], [b]) => a.localeCompare(b));

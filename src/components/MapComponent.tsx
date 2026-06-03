@@ -2,8 +2,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { getDynamicPresence, type Equipamento, type GpsPoint } from "@/lib/api";
-import { getEquipmentModel, getIconForModel, readIconConfig, renderEquipmentIconSvg, type EquipmentIconId } from "@/lib/equipment-icons";
+import { getOperationalPresenceInfo, resolveEquipmentCoordinates, type EquipmentCoordinateInfo, type Equipamento, type GpsPoint } from "@/lib/api";
+import { getEquipmentType, getIconForModel, readIconConfig, renderEquipmentIconSvg, resolveEquipmentVisualState, type EquipmentIconId } from "@/lib/equipment-icons";
 
 interface MapComponentProps {
   equipamentosComGPS: Equipamento[];
@@ -30,6 +30,7 @@ export default function MapComponent({
   const hasFittedRef = useRef(false);
   const [mapType, setMapType] = useState<"dark" | "satellite">("satellite");
   const [iconConfig, setIconConfig] = useState<Record<string, EquipmentIconId>>({});
+  const [zoomLevel, setZoomLevel] = useState(13);
 
   useEffect(() => {
     const refresh = () => setIconConfig(readIconConfig());
@@ -63,6 +64,8 @@ export default function MapComponent({
 
     L.control.zoom({ position: "bottomright" }).addTo(map);
     mapRef.current = map;
+    setZoomLevel(map.getZoom());
+    map.on("zoomend", () => setZoomLevel(map.getZoom()));
 
     const resizeObserver = new ResizeObserver(() => {
       if (mapRef.current) mapRef.current.invalidateSize();
@@ -95,14 +98,33 @@ export default function MapComponent({
 
   // 3. Gerador de Ícones PADRONIZADOS (Nova Versão SILO OPS)
   const createIcon = useCallback((eq: Equipamento, isActive: boolean) => {
-    const p = getDynamicPresence(eq.last_seen);
-    const model = getEquipmentModel(eq);
+    const model = getEquipmentType(eq);
     const iconData = getIconForModel(model, iconConfig);
-
-    // Cores de status (Ponto de Presença)
-    const statusColor = p === "ONLINE" ? "#00e676" : p === "INSTAVEL" ? "#ffab00" : "#ff3d57";
+    const statusTone = resolveEquipmentVisualState(eq as unknown as Record<string, unknown>);
+    const presenceTone = getOperationalPresenceInfo(eq.last_seen);
+    const statusColor = statusTone.color;
     const typeColor = iconData.color;
-    const isOnline = p === "ONLINE";
+    const isOffline = statusTone.key === "OFFLINE";
+    const isInstavel = statusTone.key === "INSTAVEL";
+    const compact = zoomLevel < 14;
+    const outerWidth = compact ? 62 : 76;
+    const outerHeight = compact ? 88 : 102;
+    const circleSize = compact ? 44 : 52;
+    const iconSize = compact ? 22 : 28;
+    const direction = isActive && rastro.length > 1
+      ? (() => {
+          const prev = rastro[rastro.length - 2];
+          const last = rastro[rastro.length - 1];
+          const toRad = (deg: number) => (deg * Math.PI) / 180;
+          const toDeg = (rad: number) => (rad * 180) / Math.PI;
+          const lat1 = toRad(Number(prev.latitude));
+          const lat2 = toRad(Number(last.latitude));
+          const dLon = toRad(Number(last.longitude) - Number(prev.longitude));
+          const y = Math.sin(dLon) * Math.cos(lat2);
+          const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+          return (toDeg(Math.atan2(y, x)) + 360) % 360;
+        })()
+      : null;
 
     return L.divIcon({
       className: "sil-marker-node",
@@ -112,8 +134,8 @@ export default function MapComponent({
           flex-direction: column;
           align-items: center;
           justify-content: center;
-          width: 76px;
-          height: 102px;
+          width: ${outerWidth}px;
+          height: ${outerHeight}px;
           pointer-events: none;
           transform: scale(${isActive ? 1.15 : 1});
           transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
@@ -126,9 +148,9 @@ export default function MapComponent({
             background: rgba(5,10,15,0.96);
             color: #fff;
             font-family: 'JetBrains Mono', monospace;
-            font-size: 10px;
+            font-size: ${compact ? "9px" : "10px"};
             font-weight: 900;
-            padding: 2px 7px;
+            padding: ${compact ? "2px 6px" : "2px 7px"};
             border-radius: 999px;
             border: 1px solid ${statusColor};
             margin-bottom: -5px;
@@ -139,13 +161,14 @@ export default function MapComponent({
           ">
             <span style="width: 7px; height: 7px; border-radius: 999px; background: ${statusColor}; box-shadow: 0 0 8px ${statusColor};"></span>
             <span>${eq.trator_id}</span>
-            <span style="color:${statusColor};">${p}</span>
+            <span style="color:${statusColor};">${statusTone.short}</span>
+            ${compact ? "" : `<span style="color:#7f9bb8;font-size:9px;">${presenceTone.label}</span>`}
           </div>
 
           <!-- Círculo Principal com Ícone -->
           <div style="
-            width: 52px;
-            height: 52px;
+            width: ${circleSize}px;
+            height: ${circleSize}px;
             background: radial-gradient(circle at 35% 30%, rgba(255,255,255,0.18), rgba(255,255,255,0.02) 42%, rgba(0,0,0,0.22) 100%), ${typeColor};
             border: 3px solid ${statusColor};
             border-radius: 18px 18px 18px 4px;
@@ -158,11 +181,12 @@ export default function MapComponent({
             z-index: 1000;
             position: relative;
             overflow: visible;
-            ${isOnline ? "" : "filter: saturate(0.8) brightness(0.92);"}
+            ${isOffline ? "filter: grayscale(1) brightness(0.86);" : isInstavel ? "filter: saturate(0.8) brightness(0.92);" : ""}
           ">
-            <div style="width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;">
-                ${renderEquipmentIconSvg(iconData.svgPath, 28)}
+            <div style="width: ${iconSize}px; height: ${iconSize}px; display: flex; align-items: center; justify-content: center;">
+                ${renderEquipmentIconSvg(iconData.svgPath, iconSize)}
             </div>
+            ${direction !== null ? `<div style="position:absolute;right:-7px;top:-7px;width:18px;height:18px;display:flex;align-items:center;justify-content:center;transform:rotate(${direction}deg);background:rgba(5,10,15,0.9);border:1px solid ${statusColor};border-radius:999px;color:${statusColor};font-size:10px;box-shadow:0 0 8px rgba(0,0,0,0.35);">▲</div>` : ""}
 
             <div style="
                 position: absolute;
@@ -181,17 +205,23 @@ export default function MapComponent({
           ${isActive ? `<div class="pulse-ring"></div>` : ""}
         </div>
       `,
-      iconSize: [76, 102],
-      iconAnchor: [38, 95]
+      iconSize: [outerWidth, outerHeight],
+      iconAnchor: [outerWidth / 2, outerHeight - 7]
     });
-  }, [iconConfig]);
+  }, [iconConfig, zoomLevel, rastro]);
 
   // 4. Gestão de Marcadores e Centralização Inteligente
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
 
-    const currentIds = new Set(equipamentosComGPS.map(e => e.trator_id));
+    const validPoints = equipamentosComGPS
+      .map(eq => ({ eq, coords: resolveEquipmentCoordinates(eq as unknown as Record<string, unknown>) }))
+      .filter((item): item is { eq: Equipamento; coords: EquipmentCoordinateInfo & { latitude: number; longitude: number } } =>
+        item.coords.hasCoordinates && item.coords.latitude !== null && item.coords.longitude !== null
+      );
+
+    const currentIds = new Set(validPoints.map(item => item.eq.trator_id));
 
     // Cleanup órfãos
     Object.keys(markersRef.current).forEach(id => {
@@ -201,25 +231,16 @@ export default function MapComponent({
       }
     });
 
-    // Filtra pontos válidos (não 0,0)
-    const validPoints = equipamentosComGPS.filter(e => {
-        const lat = Number(e.latitude);
-        const lon = Number(e.longitude);
-        return !isNaN(lat) && !isNaN(lon) && (lat !== 0 || lon !== 0);
-    });
-
     // Adiciona ou Atualiza
-    validPoints.forEach(eq => {
-      const lat = Number(eq.latitude);
-      const lon = Number(eq.longitude);
-      const pos = new L.LatLng(lat, lon);
+    validPoints.forEach(({ eq, coords }) => {
+      const pos = new L.LatLng(coords.latitude, coords.longitude);
       const isSelected = selectedId === eq.trator_id;
 
       if (markersRef.current[eq.trator_id]) {
         const m = markersRef.current[eq.trator_id];
         m.setLatLng(pos);
         m.setIcon(createIcon(eq, isSelected));
-        m.setZIndexOffset(isSelected ? 30000 : (getDynamicPresence(eq.last_seen) === "ONLINE" ? 5000 : 100));
+        m.setZIndexOffset(isSelected ? 30000 : (getOperationalPresenceInfo(eq.last_seen).label === "ONLINE" ? 5000 : 100));
       } else {
         const m = L.marker(pos, {
             icon: createIcon(eq, isSelected),
@@ -244,18 +265,18 @@ export default function MapComponent({
     if (validPoints.length > 0 && !hasFittedRef.current) {
         hasFittedRef.current = true;
 
-        // Verifica dispersão (se estão muito longe, ex: Brasil e EUA)
-        const lats = validPoints.map(p => Number(p.latitude));
-        const lons = validPoints.map(p => Number(p.longitude));
+        // Verifica dispers?o (se est?o muito longe, ex: Brasil e EUA)
+        const lats = validPoints.map(p => Number(p.coords.latitude));
+        const lons = validPoints.map(p => Number(p.coords.longitude));
         const latDiff = Math.max(...lats) - Math.min(...lats);
         const lonDiff = Math.max(...lons) - Math.min(...lons);
 
         if (latDiff > 5 || lonDiff > 5) {
-            // Estão muito longe. Prioriza o mais recente
-            const sorted = [...validPoints].sort((a,b) => new Date(b.last_seen).getTime() - new Date(a.last_seen).getTime());
-            map.setView([Number(sorted[0].latitude), Number(sorted[0].longitude)], 17);
+            // Est?o muito longe. Prioriza o mais recente
+            const sorted = [...validPoints].sort((a,b) => new Date(b.eq.last_seen).getTime() - new Date(a.eq.last_seen).getTime());
+            map.setView([Number(sorted[0].coords.latitude), Number(sorted[0].coords.longitude)], 17);
         } else {
-            const bounds = L.latLngBounds(validPoints.map(e => [Number(e.latitude), Number(e.longitude)]));
+            const bounds = L.latLngBounds(validPoints.map(e => [Number(e.coords.latitude), Number(e.coords.longitude)]));
             map.fitBounds(bounds, { padding: [100, 100], maxZoom: 17 });
         }
     }
@@ -343,7 +364,10 @@ export default function MapComponent({
         <button onClick={() => {
             if (onDeselect) onDeselect();
             hasFittedRef.current = false;
-            const valid = equipamentosComGPS.map(e => [Number(e.latitude), Number(e.longitude)] as [number, number]).filter(c => c[0] !== 0);
+            const valid = equipamentosComGPS
+              .map(eq => resolveEquipmentCoordinates(eq as unknown as Record<string, unknown>))
+              .filter(coords => coords.hasCoordinates)
+              .map(coords => [Number(coords.latitude), Number(coords.longitude)] as [number, number]);
             if (mapRef.current && valid.length > 0) {
                 const bounds = L.latLngBounds(valid);
                 mapRef.current.fitBounds(bounds, { padding: [150, 150], maxZoom: 17 });

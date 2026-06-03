@@ -1,10 +1,13 @@
 import { type Equipamento } from "@/lib/api";
+import { getEquipmentTypeLabel, normalizeEquipmentType, type EquipmentType } from "@/lib/equipment-type";
 
 export type EquipmentIconId =
   | "trator"
   | "colhedora"
   | "transbordo"
   | "caminhao"
+  | "comboio"
+  | "carregadeira"
   | "pulverizador"
   | "plantadeira"
   | "escavadeira"
@@ -39,6 +42,16 @@ const ICON_CONFIGS: Record<EquipmentIconId, { svg: string, color: string, label:
     color: "#2196f3", // Azul
     svg: `<path d="M20 10H15V8H4C2.9 8 2 8.9 2 10V17H4C4 18.1 4.9 19 6 19C7.1 19 8 18.1 8 17H14C14 18.1 14.9 19 16 19C17.1 19 18 18.1 18 17H20V13L22 15V10C22 8.9 21.1 8 20 10ZM17 11H20V13H17V11Z" fill="black"/>`
   },
+  comboio: {
+    label: "Comboio",
+    color: "#00bcd4",
+    svg: `<path d="M3 14h10v4H3v-4Zm12-2h4l2 2v4h-6v-6Zm-2-4h3v2h-3V8Zm-1 8h2v2h-2v-2Z" fill="black"/>`
+  },
+  carregadeira: {
+    label: "Carregadeira",
+    color: "#8bc34a",
+    svg: `<path d="M4 18h16v2H4v-2Zm3-2h10v-2H9.5L8 11H5l2 5Zm7.5-6L18 6h2l-2.5 4H14.5Z" fill="black"/>`
+  },
   pulverizador: {
     label: "Pulverizador",
     color: "#9c27b0", // Roxo
@@ -66,32 +79,51 @@ const ICON_CONFIGS: Record<EquipmentIconId, { svg: string, color: string, label:
   }
 };
 
+const TYPE_TO_ICON: Record<EquipmentType, EquipmentIconId> = {
+  COLHEDORA: "colhedora",
+  TRANSBORDO: "transbordo",
+  CAMINHAO: "caminhao",
+  COMBOIO: "comboio",
+  TRATOR: "trator",
+  CARREGADEIRA: "carregadeira",
+  APOIO: "apoio",
+  OUTRO: "default",
+};
+
 export function getIconForModel(model: string, config: Record<string, EquipmentIconId>): EquipmentIcon {
-  const iconId: EquipmentIconId = config[model] || "trator";
+  const type = (model || "OUTRO").toUpperCase() as EquipmentType;
+  const iconId: EquipmentIconId = config[type] || TYPE_TO_ICON[type] || "default";
   const cfg = ICON_CONFIGS[iconId] || ICON_CONFIGS.default;
   return { id: iconId, label: cfg.label, svgPath: cfg.svg, color: cfg.color };
 }
 
 export function getEquipmentModel(eq: Equipamento): string {
-  // Tenta extrair o modelo do ID (ex: T01 -> Trator, CH01 -> Colhedora)
-  const id = (eq.trator_id || "").toUpperCase();
-  if (id.startsWith("T")) return "TRATOR";
-  if (id.startsWith("CH") || id.startsWith("COL")) return "COLHEDORA";
-  if (id.startsWith("TB")) return "TRANSBORDO";
-  if (id.startsWith("CAM")) return "CAMINHAO";
-  if (id.startsWith("PV") || id.startsWith("PUL")) return "PULVERIZADOR";
-  if (id.startsWith("PL") || id.startsWith("PLAN")) return "PLANTADEIRA";
-  if (id.startsWith("EX") || id.startsWith("ESC")) return "ESCAVADEIRA";
-  if (id.startsWith("AP") || id.startsWith("SERV")) return "APOIO";
+  return normalizeEquipmentType(eq as unknown as Record<string, unknown>);
+}
 
-  // Fallback via status
-  const status = (eq.status || "").toUpperCase();
-  if (status.includes("COLHEIT")) return "COLHEDORA";
-  if (status.includes("PULVER")) return "PULVERIZADOR";
-  if (status.includes("CAMINHAO")) return "CAMINHAO";
-  if (status.includes("ESCAVAD")) return "ESCAVADEIRA";
+export function getEquipmentType(eq: Equipamento | Record<string, unknown>): EquipmentType {
+  return normalizeEquipmentType(eq as Record<string, unknown>);
+}
 
-  return "TRATOR"; // Default
+export function getEquipmentTypeDisplay(type: string): string {
+  return getEquipmentTypeLabel((type || "OUTRO").toUpperCase() as EquipmentType);
+}
+
+type EquipmentVisualState = "ONLINE" | "INSTAVEL" | "OFFLINE" | "DESLOCAMENTO" | "PARADO_APONTAMENTO" | "ALERTA";
+
+export function resolveEquipmentVisualState(item: Record<string, unknown> & { last_seen?: string | null }): { key: EquipmentVisualState; color: string; label: string; short: string } {
+  const status = String(item.status ?? item.presence ?? "").toUpperCase();
+  const operational = String(item.estado_operacional ?? "").toUpperCase();
+  const velocity = Number(item.velocidade ?? item.speed ?? 0);
+  const hasStop = Boolean(item.codigo_parada || item.descricao_parada);
+  const hasAlert = /ALERT|ERRO|FALH|INCID|CRIT/.test(`${status} ${operational}`);
+
+  if (hasAlert) return { key: "ALERTA", color: "#a855f7", label: "Alerta operacional", short: "ALERTA" };
+  if (/OFF|DESLIG|SEM SINAL|SEM_SINAL/.test(status)) return { key: "OFFLINE", color: "#ef4444", label: "Offline", short: "OFF" };
+  if (/INST/.test(status) || /INST/.test(operational)) return { key: "INSTAVEL", color: "#f59e0b", label: "Instável", short: "INST" };
+  if (hasStop && /PARAD/.test(operational)) return { key: "PARADO_APONTAMENTO", color: "#ff9800", label: "Parado com apontamento", short: "PAR" };
+  if (velocity > 1 || /DESLOC|MOV/.test(status) || /MOV/.test(operational)) return { key: "DESLOCAMENTO", color: "#2196f3", label: "Deslocamento", short: "MOV" };
+  return { key: "ONLINE", color: "#22c55e", label: "Ativo", short: "ON" };
 }
 
 export function renderEquipmentIconSvg(svgPath: string, size = 24): string {

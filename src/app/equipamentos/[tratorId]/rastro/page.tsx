@@ -6,7 +6,8 @@ import { useParams, useRouter } from "next/navigation";
 import Header from "@/components/Header";
 import Badge from "@/components/Badge";
 import ApiErr from "@/components/ApiErr";
-import { api, fmtDate, timeAgo, type GpsPoint } from "@/lib/api";
+import { api, fmtDate, timeAgo, type GpsPoint, type EquipmentDetails } from "@/lib/api";
+import { getEquipmentType, getEquipmentTypeDisplay, getIconForModel, renderEquipmentIconSvg, resolveEquipmentVisualState } from "@/lib/equipment-icons";
 
 type TrailPoint = GpsPoint & {
   status?: string | null;
@@ -68,6 +69,7 @@ export default function EquipamentoRastroPage() {
   const params = useParams<{ tratorId: string }>();
   const tratorId = Array.isArray(params?.tratorId) ? params.tratorId[0] : params?.tratorId || "";
   const [points, setPoints] = useState<TrailPoint[]>([]);
+  const [details, setDetails] = useState<EquipmentDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [preset, setPreset] = useState<PeriodPreset>("24h");
@@ -79,7 +81,7 @@ export default function EquipamentoRastroPage() {
     async function load() {
       setLoading(true);
       setError(null);
-      const result = await api.rastro(tratorId, 1000);
+      const [result, detailResult] = await Promise.all([api.rastro(tratorId, 1000), api.equipamentoDetalhes(tratorId)]);
       if (!active) return;
       if (result.ok) {
         setPoints(result.data as TrailPoint[]);
@@ -87,6 +89,7 @@ export default function EquipamentoRastroPage() {
         setPoints([]);
         setError(result.error);
       }
+      if (detailResult.ok) setDetails(detailResult.data);
       setLoading(false);
     }
     if (tratorId) load();
@@ -101,28 +104,35 @@ export default function EquipamentoRastroPage() {
     const start = preset === "custom" ? customStart : periodStart(preset);
     const end = preset === "custom" ? customEnd : null;
 
-    return points.filter((point) => {
-      const ts = new Date(point.timestamp).getTime();
-      if (!Number.isFinite(ts)) return false;
-      if (start !== null && ts < start) return false;
-      if (end !== null && ts > end) return false;
-      return true;
-    }).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+    return points
+      .filter((point) => {
+        const ts = new Date(point.timestamp).getTime();
+        if (!Number.isFinite(ts)) return false;
+        if (start !== null && ts < start) return false;
+        if (end !== null && ts > end) return false;
+        return true;
+      })
+      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
   }, [points, preset, customFrom, customTo]);
 
   const stats = useMemo(() => {
     const first = filteredPoints.length > 0 ? filteredPoints[0] : null;
     const last = filteredPoints.length > 0 ? filteredPoints[filteredPoints.length - 1] : null;
-    const km = filteredPoints.length > 1 ? filteredPoints.reduce((total, point, index) => {
-      if (index === 0) return total;
-      return total + haversineKm(filteredPoints[index - 1], point);
-    }, 0) : null;
+    const km = filteredPoints.length > 1
+      ? filteredPoints.reduce((total, point, index) => {
+          if (index === 0) return total;
+          return total + haversineKm(filteredPoints[index - 1], point);
+        }, 0)
+      : null;
     const duration = first && last ? new Date(last.timestamp).getTime() - new Date(first.timestamp).getTime() : 0;
     return { first, last, km, duration: first && last ? duration : null };
   }, [filteredPoints]);
 
   const lastPoint = filteredPoints.length > 0 ? filteredPoints[filteredPoints.length - 1] : null;
   const hasPoints = filteredPoints.length > 0;
+  const type = details ? getEquipmentType(details as unknown as Record<string, unknown>) : "OUTRO";
+  const icon = details ? getIconForModel(type, {}) : null;
+  const visual = details ? resolveEquipmentVisualState(details as unknown as Record<string, unknown>) : null;
 
   return (
     <div className="flex-1 flex flex-col min-h-screen">
@@ -135,6 +145,29 @@ export default function EquipamentoRastroPage() {
           </div>
           <div className="text-[#4a6a8a] text-xs font-mono">Atualizado: {lastPoint ? timeAgo(lastPoint.timestamp) : "--"}</div>
         </div>
+
+        {details && (
+          <div className="card-p flex items-center justify-between gap-4 border border-[#1f334d] bg-[#0d1420]">
+            <div className="flex items-center gap-4">
+              <div className="h-14 w-14 rounded-2xl border border-white/10 flex items-center justify-center" style={{ backgroundColor: `${icon?.color || "#00d4ff"}20` }}>
+                {icon ? <div dangerouslySetInnerHTML={{ __html: renderEquipmentIconSvg(icon.svgPath, 30) }} /> : null}
+              </div>
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#4a6a8a]">Identidade operacional</p>
+                <h3 className="text-white font-black text-xl">{details.nome_equipamento || tratorId}</h3>
+                <div className="mt-1 flex items-center gap-2 flex-wrap">
+                  <span className="text-[11px] font-mono font-black uppercase tracking-widest text-[#8fdfff]">{tratorId}</span>
+                  <Badge label={getEquipmentTypeDisplay(type)} variant="info" dot={false} />
+                  <Badge label={visual?.label || details.status || details.presence || "Sem status"} variant={visual?.key === "OFFLINE" ? "offline" : visual?.key === "INSTAVEL" ? "instavel" : visual?.key === "ALERTA" ? "erro" : visual?.key === "PARADO_APONTAMENTO" ? "pendente" : visual?.key === "DESLOCAMENTO" ? "enviado" : "online"} />
+                </div>
+              </div>
+            </div>
+            <div className="text-right text-xs text-[#4a6a8a] max-w-xs">
+              <div>Estado operacional: <span className="text-[#c8d8e8] font-mono">{details.estado_operacional || "--"}</span></div>
+              <div>Operação: <span className="text-[#c8d8e8] font-mono">{details.operacao_nome || "--"}</span></div>
+            </div>
+          </div>
+        )}
 
         {error && <ApiErr label="/api/equipamentos/[tratorId]/rastro" msg={error} />}
 
@@ -178,11 +211,7 @@ export default function EquipamentoRastroPage() {
         ) : (
           <div className="grid xl:grid-cols-3 gap-4">
             <div className="xl:col-span-2">
-              <TrailMapClient
-                points={filteredPoints}
-                title={`Trajeto ${tratorId}`}
-                emptyMessage="Nenhum ponto de rastro encontrado para este equipamento no período."
-              />
+              <TrailMapClient points={filteredPoints} title={`Trajeto ${tratorId}`} emptyMessage="Nenhum ponto de rastro encontrado para este equipamento no período." />
             </div>
             <div className="card-p space-y-3 max-h-[520px] overflow-auto">
               <h3 className="text-white font-black">Pontos GPS</h3>

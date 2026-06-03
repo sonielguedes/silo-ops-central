@@ -33,6 +33,7 @@ test("local proxy route exists for /api/equipamentos/status", () => {
 test("equipment trail page and proxy route exist with cookie guard and tenant-safe rendering", () => {
   const pageSource = readFileSync(new URL("../src/app/equipamentos/[tratorId]/rastro/page.tsx", import.meta.url), "utf8");
   const routeSource = readFileSync(new URL("../src/app/api/equipamentos/[tratorId]/rastro/route.ts", import.meta.url), "utf8");
+  const detailsRouteSource = readFileSync(new URL("../src/app/api/equipamentos/[tratorId]/detalhes/route.ts", import.meta.url), "utf8");
 
   assert.match(pageSource, /TrailMap/);
   assert.match(pageSource, /Km estimado/);
@@ -51,13 +52,18 @@ test("equipment trail page and proxy route exist with cookie guard and tenant-sa
   assert.match(routeSource, /telemetria/);
   assert.match(routeSource, /api\/equipamentos\/status/);
   assert.match(routeSource, /enrichTrailPointWithOperationalContext/);
+  assert.match(detailsRouteSource, /buildEquipmentDetails/);
+  assert.match(detailsRouteSource, /unauthorized/);
+  assert.match(detailsRouteSource, /not_found/);
   assert.equal(existsSync(new URL("../src/app/equipamentos/[tratorId]/rastro/page.tsx", import.meta.url)), true);
+  assert.equal(existsSync(new URL("../src/app/api/equipamentos/[tratorId]/detalhes/route.ts", import.meta.url)), true);
 });
 
 test("equipment trail page handles empty API payload without indexing points", () => {
   const pageSource = readFileSync(new URL("../src/app/equipamentos/[tratorId]/rastro/page.tsx", import.meta.url), "utf8");
   const trailMapSource = readFileSync(new URL("../src/components/TrailMap.tsx", import.meta.url), "utf8");
   const trailHelperSource = readFileSync(new URL("../src/lib/trail-map.ts", import.meta.url), "utf8");
+  const drawerSource = readFileSync(new URL("../src/components/EquipmentDetailsDrawer.tsx", import.meta.url), "utf8");
 
   assert.match(pageSource, /Nenhum ponto de rastro encontrado para este equipamento no período\./);
   assert.match(pageSource, /stats\.km === null/);
@@ -74,6 +80,10 @@ test("equipment trail page handles empty API payload without indexing points", (
   assert.match(trailHelperSource, /buildPointTooltip/);
   assert.match(trailHelperSource, /buildJumpTooltip/);
   assert.match(trailHelperSource, /isGpsJump/);
+  assert.match(drawerSource, /Ver rastro/);
+  assert.match(drawerSource, /Ver eventos/);
+  assert.match(drawerSource, /Ver opera/);
+  assert.match(drawerSource, /Tentar novamente/);
   assert.match(pageSource, /Estado operacional/);
   assert.match(pageSource, /Código de parada/);
   assert.match(pageSource, /Descrição da parada/);
@@ -149,13 +159,15 @@ test("map uses configurable equipment icons and menu exposes icon configuration"
   assert.match(mapSource, /getIconForModel/);
   assert.match(mapSource, /renderEquipmentIconSvg/);
   assert.match(mapSource, /resolveEquipmentCoordinates/);
+  assert.match(mapSource, /resolveEquipmentVisualState/);
   assert.match(mapSource, /coords\.hasCoordinates/);
-  assert.match(mapSource, /iconAnchor:\s*\[38,\s*95\]/);
+  assert.match(mapSource, /iconAnchor:\s*\[/);
   assert.match(mapSource, /border-top:\s*12px solid \${statusColor}/);
   assert.match(sidebarSource, /\/equipamentos\/icones/);
   assert.match(sidebarSource, /\/equipamentos\/rastro/);
   assert.equal(existsSync(new URL("../src/app/equipamentos/icones/page.tsx", import.meta.url)), true);
   assert.equal(existsSync(new URL("../src/app/equipamentos/rastro/page.tsx", import.meta.url)), true);
+  assert.equal(existsSync(new URL("../src/app/api/equipamentos/[tratorId]/detalhes/route.ts", import.meta.url)), true);
 });
 
 test("map page only renders markers for valid coordinates and lists the reason for missing GPS", () => {
@@ -172,7 +184,9 @@ test("equipment list exposes direct trail navigation on each row", () => {
 
   assert.match(equipmentsSource, /Ver Rastro/);
   assert.match(equipmentsSource, /\/equipamentos\/\$\{eq\.trator_id\}\/rastro/);
-  assert.match(equipmentsSource, /Estado operacional/);
+  assert.match(equipmentsSource, /EquipmentDetailsDrawer/);
+  assert.match(equipmentsSource, /selectedId/);
+  assert.match(equipmentsSource, /open=\{Boolean\(selectedId\)\}/);
   assert.match(trailIndexSource, /Rastro dos Equipamentos/);
   assert.match(trailIndexSource, /Ver rastro/);
   assert.match(trailIndexSource, /Último sinal/);
