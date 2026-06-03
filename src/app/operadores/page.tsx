@@ -7,6 +7,7 @@ import Badge from "@/components/Badge";
 import EmptyState from "@/components/dashboard/EmptyState";
 import { APP_ENV, CAN_LOCAL_OPERADORES_CRUD, IS_DEMO } from "@/lib/app-env";
 import { timeAgo } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
 
 type Op = { matricula: string; nome: string; funcao: string | null; ativo: boolean; atualizado_em: string; origem?: "api" | "local" | "demo" };
 
@@ -40,6 +41,7 @@ function validateForm(form: { matricula: string; nome: string; funcao: string; a
 }
 
 export default function OperadoresPage() {
+  const { session } = useAuth();
   const [ops, setOps] = useState<Op[]>([]);
   const [err, setErr] = useState<string | null>(null);
   const [pageNotice, setPageNotice] = useState<string | null>(null);
@@ -50,6 +52,7 @@ export default function OperadoresPage() {
   const [form, setForm] = useState({ matricula: "", nome: "", funcao: "", ativo: true });
   const [formNotice, setFormNotice] = useState<string | null>(null);
   const ref = useRef<(() => Promise<void>) | null>(null);
+  const canWrite = session?.role === "ADMIN_GLOBAL" || session?.role === "ADMIN_EMPRESA";
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -111,6 +114,11 @@ export default function OperadoresPage() {
       return;
     }
 
+    if (!canWrite) {
+      setFormNotice("Somente ADMIN_GLOBAL e ADMIN_EMPRESA podem criar ou editar operadores.");
+      return;
+    }
+
     if (CAN_LOCAL_OPERADORES_CRUD) {
       const now = new Date().toISOString();
       const existing = readLocalOps();
@@ -160,6 +168,12 @@ export default function OperadoresPage() {
     <div className="flex-1 flex flex-col min-h-screen">
       <Header title="Operadores" sub="Matrículas, funções e status operacional" />
       <main className="p-6 space-y-5">
+        {!canWrite && (
+          <div className="card-p border border-[#1f334d] bg-[#101b2d]">
+            <p className="text-[#ffab00] font-semibold text-sm">Leitura somente</p>
+            <p className="text-[#4a6a8a] text-xs mt-1">Seu perfil pode consultar o cadastro, mas não gravar alterações.</p>
+          </div>
+        )}
         {err && <div className="card-p border border-[#ffab00]/20 bg-[#ffab00]/5"><p className="text-[#ffab00] font-semibold text-sm">Status técnico</p><p className="text-[#4a6a8a] text-xs mt-1">{err}</p></div>}
         {pageNotice && <div className="card-p border border-[#ffab00]/20 bg-[#ffab00]/5"><p className="text-[#ffab00] font-semibold text-sm">Aviso</p><p className="text-[#4a6a8a] text-xs mt-1">{pageNotice}</p></div>}
         {(IS_DEMO || CAN_LOCAL_OPERADORES_CRUD) && (
@@ -179,7 +193,7 @@ export default function OperadoresPage() {
         <SectionHeader title="Cadastro de operadores" sub="Busca, status e manutenção de matrículas" />
         <div className="flex gap-3 items-center">
           <input className="sil-input max-w-xs" placeholder="Pesquisar por nome, matrícula ou função..." value={search} onChange={e => setSearch(e.target.value)} />
-          <button className="btn-primary" onClick={() => { setForm({ matricula: "", nome: "", funcao: "", ativo: true }); setEditing(null); setFormNotice(null); setShowForm(true); }}>{IS_DEMO ? "Bloqueado" : "+ Cadastrar Operador"}</button>
+          <button className="btn-primary" onClick={() => { setForm({ matricula: "", nome: "", funcao: "", ativo: true }); setEditing(null); setFormNotice(null); setShowForm(true); }} disabled={!canWrite || IS_DEMO}>{IS_DEMO ? "Bloqueado" : canWrite ? "+ Cadastrar Operador" : "Leitura"}</button>
         </div>
 
         {loading ? <div className="card-p h-64 animate-pulse" /> : filtered.length === 0 ? <EmptyState title="Nenhum operador" sub="Nenhum cadastro encontrado para os filtros atuais." /> : (
@@ -196,7 +210,7 @@ export default function OperadoresPage() {
                 <p className="text-[#4a6a8a] text-xs mt-3">{op.funcao || "Operador"}</p>
                 <p className="text-[#4a6a8a] text-[10px] mt-2">{timeAgo(op.atualizado_em)}</p>
                 <div className="mt-4 flex gap-2">
-                  <button className="btn-ghost" disabled={IS_DEMO} onClick={() => { if (IS_DEMO) return; setEditing(op.matricula); setForm({ matricula: op.matricula, nome: op.nome, funcao: op.funcao || "", ativo: op.ativo }); setFormNotice(null); setShowForm(true); }}>{IS_DEMO ? "Leitura" : "Editar"}</button>
+                  <button className="btn-ghost" disabled={IS_DEMO || !canWrite} onClick={() => { if (IS_DEMO || !canWrite) return; setEditing(op.matricula); setForm({ matricula: op.matricula, nome: op.nome, funcao: op.funcao || "", ativo: op.ativo }); setFormNotice(null); setShowForm(true); }}>{IS_DEMO ? "Leitura" : canWrite ? "Editar" : "Leitura"}</button>
                   <button className="btn-ghost" disabled>{op.ativo ? "Ativo" : "Inativo"}</button>
                 </div>
               </div>
@@ -224,7 +238,7 @@ export default function OperadoresPage() {
                 <input type="checkbox" checked={form.ativo} onChange={e => setForm({ ...form, ativo: e.target.checked })} disabled={IS_DEMO} />
                 Ativo
               </label>
-              <button className="btn-primary w-full" type="submit" disabled={IS_DEMO}>{IS_DEMO ? "Bloqueado" : "Salvar"}</button>
+              <button className="btn-primary w-full" type="submit" disabled={IS_DEMO || !canWrite}>{IS_DEMO ? "Bloqueado" : canWrite ? "Salvar" : "Leitura"}</button>
             </form>
           </div>
         )}

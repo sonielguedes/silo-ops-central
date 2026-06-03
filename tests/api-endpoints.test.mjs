@@ -168,6 +168,16 @@ test("map uses configurable equipment icons and menu exposes icon configuration"
   assert.equal(existsSync(new URL("../src/app/equipamentos/icones/page.tsx", import.meta.url)), true);
   assert.equal(existsSync(new URL("../src/app/equipamentos/rastro/page.tsx", import.meta.url)), true);
   assert.equal(existsSync(new URL("../src/app/api/equipamentos/[tratorId]/detalhes/route.ts", import.meta.url)), true);
+  assert.match(sidebarSource, /Cadastros Operacionais/);
+  assert.match(sidebarSource, /Telemetria & Eventos/);
+  assert.match(sidebarSource, /Sistema & Relatórios/);
+  assert.match(sidebarSource, /\/cadastros\/equipamentos\/tipos/);
+  assert.match(sidebarSource, /\/telemetria\/conectividade/);
+  assert.match(sidebarSource, /\/comando-online/);
+  assert.equal(existsSync(new URL("../src/app/cadastros/equipamentos/tipos/page.tsx", import.meta.url)), true);
+  assert.equal(existsSync(new URL("../src/app/cadastros/operacoes/page.tsx", import.meta.url)), true);
+  assert.equal(existsSync(new URL("../src/app/telemetria/conectividade/page.tsx", import.meta.url)), true);
+  assert.equal(existsSync(new URL("../src/app/comando-online/page.tsx", import.meta.url)), true);
 });
 
 test("map page only renders markers for valid coordinates and lists the reason for missing GPS", () => {
@@ -205,12 +215,24 @@ test("operations page does not slice nullable API fields directly", () => {
 test("operators page blocks demo writes and supports localStorage CRUD", () => {
   const source = readFileSync(new URL("../src/app/operadores/page.tsx", import.meta.url), "utf8");
 
+  assert.match(source, /useAuth/);
+  assert.match(source, /Somente ADMIN_GLOBAL e ADMIN_EMPRESA podem criar ou editar operadores\./);
   assert.match(source, /CAN_LOCAL_OPERADORES_CRUD/);
   assert.match(source, /readLocalOps/);
   assert.match(source, /writeLocalOps/);
   assert.match(source, /Ambiente demonstrativo: cadastro real desativado\./);
   assert.match(source, /Cadastro salvo somente em localStorage para demonstração\./);
   assert.match(source, /Falha técnica ao salvar operador\./);
+});
+
+test("cadastros operacionais placeholder shell exists", () => {
+  const shellSource = readFileSync(new URL("../src/components/OperationalRegistryShell.tsx", import.meta.url), "utf8");
+  const docSource = readFileSync(new URL("../docs/specs/cadastros-operacionais.md", import.meta.url), "utf8");
+
+  assert.match(shellSource, /EM PREPARAÇÃO/);
+  assert.match(shellSource, /TENANT-AWARE/);
+  assert.match(docSource, /Cadastros Operacionais/);
+  assert.match(docSource, /\/cadastros\/equipamentos\/tipos/);
 });
 
 test("api/eventos route returns controlled technical empty payload", () => {
@@ -311,7 +333,10 @@ test("sidebar only exposes production-ready routes", () => {
   const routes = ["/", "/mapa", "/operacoes", "/equipamentos", "/equipamentos/icones", "/operadores", "/fazendas", "/telemetria", "/eventos", "/alertas", "/sincronizacao", "/configuracoes-op", "/relatorios", "/power-bi", "/auditoria", "/configuracoes", "/admin/empresas", "/admin/usinas", "/admin/unidades", "/admin/usuarios"];
 
   routes.forEach(route => assert.match(sidebarSource, new RegExp(route.replace(/\//g, "\\/"))));
-  assert.match(sidebarSource, /ADMINISTRAÇÃO/);
+  assert.match(sidebarSource, /Monitoramento/);
+  assert.match(sidebarSource, /Cadastros Operacionais/);
+  assert.match(sidebarSource, /Telemetria & Eventos/);
+  assert.match(sidebarSource, /Sistema & Relat/);
   assert.match(sidebarSource, /Usuários e Permissões/);
 
   assert.doesNotMatch(sidebarSource, /\/sgpa\//);

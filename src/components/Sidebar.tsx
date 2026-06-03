@@ -1,23 +1,29 @@
-﻿"use client";
+"use client";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { canAccessModule } from "@/lib/auth";
 import { useAuth } from "@/lib/auth-context";
 
-type NavItem = { href: string; label: string; icon: React.ReactNode; module: import("@/lib/auth").ModuleName };
+type NavItem = {
+  href: string;
+  label: string;
+  icon: React.ReactNode;
+  module: import("@/lib/auth").ModuleName;
+  tenantAdminOnly?: boolean;
+};
 type NavGroup = { title: string; items: NavItem[] };
-type TenantAdminItem = { href: string; label: string; icon: React.ReactNode };
 
 const homeIcon = <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>;
 const fleetIcon = <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10M13 16h4m0 0l3-4h-5v4M13 8h7v2M13 12h5" /></svg>;
 const mapIcon = <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L16 4m0 13V4m0 0L9 7" /></svg>;
 const opsIcon = <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" /></svg>;
-const eventsIcon = <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
+const routeIcon = <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 7a3 3 0 106 0 3 3 0 00-6 0zm10 10a3 3 0 106 0 3 3 0 00-6 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M7 7h5a4 4 0 014 4v3" /><path strokeLinecap="round" strokeLinejoin="round" d="M13 14H9a4 4 0 00-4 4v1" /></svg>;
 const telemetriaIcon = <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2z" /></svg>;
 const operatorIcon = <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>;
 const farmIcon = <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>;
 const alarmIcon = <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>;
+const eventsIcon = <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /><path strokeLinecap="round" strokeLinejoin="round" d="M9 13h6m-6 4h4" /></svg>;
 const syncIcon = <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 4.89M9 11l3 3L22 4" /></svg>;
 const auditIcon = <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>;
 const configOpIcon = <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>;
@@ -27,30 +33,75 @@ const buildingIcon = <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" st
 const factoryIcon = <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 21V9l6 3V9l6 3V7l4 2v12H4z" /><path strokeLinecap="round" strokeLinejoin="round" d="M4 21h16" /></svg>;
 const networkIcon = <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 3v6m0 0v6m0-6h6m-6 0H6" /><path strokeLinecap="round" strokeLinejoin="round" d="M5 21h14" /><circle cx="12" cy="3" r="2" /><circle cx="12" cy="9" r="2" /><circle cx="12" cy="15" r="2" /><circle cx="5" cy="21" r="2" /><circle cx="19" cy="21" r="2" /></svg>;
 const shieldCheckIcon = <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 3l7 4v5c0 5-3.5 8-7 9-3.5-1-7-4-7-9V7l7-4z" /><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4" /></svg>;
-const routeIcon = <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 7a3 3 0 106 0 3 3 0 00-6 0zm10 10a3 3 0 106 0 3 3 0 00-6 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M7 7h5a4 4 0 014 4v3" /><path strokeLinecap="round" strokeLinejoin="round" d="M13 14H9a4 4 0 00-4 4v1" /></svg>;
 
 const nav: NavGroup[] = [
-  { title: "Monitoramento", items: [{ href: "/", label: "Painel", icon: homeIcon, module: "dashboard" }, { href: "/mapa", label: "Mapa Operacional", icon: mapIcon, module: "mapa" }, { href: "/operacoes", label: "Operações Ativas", icon: opsIcon, module: "operacoes" }] },
-  { title: "Frota & Equipes", items: [{ href: "/equipamentos", label: "Equipamentos", icon: fleetIcon, module: "equipamentos" }, { href: "/equipamentos/rastro", label: "Rastro dos Equipamentos", icon: routeIcon, module: "equipamentos" }, { href: "/equipamentos/icones", label: "Ícones dos Equipamentos", icon: fleetIcon, module: "equipamentos" }, { href: "/operadores", label: "Cadastro de Operadores", icon: operatorIcon, module: "operadores" }, { href: "/fazendas", label: "Fazendas & Talhões", icon: farmIcon, module: "fazendas" }] },
-  { title: "Alertas & Telemetria", items: [{ href: "/telemetria", label: "Sensores de Telemetria", icon: telemetriaIcon, module: "telemetria" }, { href: "/eventos", label: "Histórico de Eventos", icon: eventsIcon, module: "eventos" }, { href: "/alertas", label: "Painel de Alertas", icon: alarmIcon, module: "alertas" }] },
-  { title: "Sistema & Relatórios", items: [{ href: "/sincronizacao", label: "Outbox / Sincronismo", icon: syncIcon, module: "sincronizacao" }, { href: "/configuracoes-op", label: "Config. Operacionais", icon: configOpIcon, module: "configuracoes-op" }, { href: "/relatorios", label: "Fichas & Relatórios", icon: relatoriosIcon, module: "relatorios" }, { href: "/power-bi", label: "Power BI", icon: relatoriosIcon, module: "power-bi" }, { href: "/auditoria", label: "Auditoria de Logs", icon: auditIcon, module: "auditoria" }, { href: "/configuracoes", label: "Configurações Globais", icon: configIcon, module: "configuracoes" }] },
-];
-
-const tenantAdminNav: TenantAdminItem[] = [
-  { href: "/admin/empresas", label: "Empresas", icon: buildingIcon },
-  { href: "/admin/usinas", label: "Usinas", icon: factoryIcon },
-  { href: "/admin/unidades", label: "Unidades", icon: networkIcon },
-  { href: "/admin/usuarios", label: "Usuários e Permissões", icon: shieldCheckIcon },
+  {
+    title: "Monitoramento",
+    items: [
+      { href: "/", label: "Painel", icon: homeIcon, module: "dashboard" },
+      { href: "/mapa", label: "Mapa Operacional", icon: mapIcon, module: "mapa" },
+      { href: "/operacoes", label: "Operações Ativas", icon: opsIcon, module: "operacoes" },
+      { href: "/equipamentos/rastro", label: "Rastro dos Equipamentos", icon: routeIcon, module: "equipamentos" },
+    ],
+  },
+  {
+    title: "Cadastros Operacionais",
+    items: [
+      { href: "/admin/empresas", label: "Empresas", icon: buildingIcon, module: "configuracoes", tenantAdminOnly: true },
+      { href: "/admin/usinas", label: "Usinas", icon: factoryIcon, module: "configuracoes", tenantAdminOnly: true },
+      { href: "/admin/unidades", label: "Unidades", icon: networkIcon, module: "configuracoes", tenantAdminOnly: true },
+      { href: "/fazendas", label: "Fazendas & Talhões", icon: farmIcon, module: "fazendas" },
+      { href: "/equipamentos", label: "Equipamentos", icon: fleetIcon, module: "equipamentos" },
+      { href: "/equipamentos/icones", label: "Ícones dos Equipamentos", icon: fleetIcon, module: "equipamentos" },
+      { href: "/cadastros/equipamentos/tipos", label: "Tipos de Equipamento", icon: fleetIcon, module: "cadastros_operacionais" },
+      { href: "/cadastros/equipamentos/modelos", label: "Modelos de Equipamento", icon: fleetIcon, module: "cadastros_operacionais" },
+      { href: "/cadastros/equipamentos/grupos", label: "Grupos de Equipamento", icon: fleetIcon, module: "cadastros_operacionais" },
+      { href: "/cadastros/equipamentos/perfis", label: "Perfis de Equipamento", icon: fleetIcon, module: "cadastros_operacionais" },
+      { href: "/cadastros/equipamentos/estados", label: "Estados Operacionais", icon: fleetIcon, module: "cadastros_operacionais" },
+      { href: "/cadastros/implementos", label: "Implementos", icon: fleetIcon, module: "cadastros_operacionais" },
+      { href: "/cadastros/implementos/medidas", label: "Medidas do Implemento", icon: fleetIcon, module: "cadastros_operacionais" },
+      { href: "/operadores", label: "Operadores", icon: operatorIcon, module: "operadores" },
+      { href: "/cadastros/cargos", label: "Cargos", icon: operatorIcon, module: "cadastros_operacionais" },
+      { href: "/cadastros/equipes", label: "Equipes", icon: operatorIcon, module: "cadastros_operacionais" },
+      { href: "/cadastros/operacoes", label: "Operações", icon: opsIcon, module: "cadastros_operacionais" },
+      { href: "/cadastros/codigos-parada", label: "Códigos de Parada", icon: alarmIcon, module: "cadastros_operacionais" },
+      { href: "/cadastros/safras", label: "Safras", icon: farmIcon, module: "cadastros_operacionais" },
+      { href: "/cadastros/combustivel", label: "Combustível", icon: farmIcon, module: "cadastros_operacionais" },
+    ],
+  },
+  {
+    title: "Telemetria & Eventos",
+    items: [
+      { href: "/telemetria", label: "Sensores de Telemetria", icon: telemetriaIcon, module: "telemetria" },
+      { href: "/telemetria/conectividade", label: "Conectividade", icon: telemetriaIcon, module: "telemetria_eventos" },
+      { href: "/eventos", label: "Histórico de Eventos", icon: eventsIcon, module: "eventos" },
+      { href: "/alertas", label: "Painel de Alertas", icon: alarmIcon, module: "alertas" },
+      { href: "/comando-online", label: "Comando Online", icon: telemetriaIcon, module: "telemetria_eventos" },
+    ],
+  },
+  {
+    title: "Sistema & Relatórios",
+    items: [
+      { href: "/sincronizacao", label: "Outbox / Sincronismo", icon: syncIcon, module: "sincronizacao" },
+      { href: "/configuracoes-op", label: "Config. Operacionais", icon: configOpIcon, module: "configuracoes-op" },
+      { href: "/admin/usuarios", label: "Usuários e Permissões", icon: shieldCheckIcon, module: "configuracoes", tenantAdminOnly: true },
+      { href: "/auditoria", label: "Auditoria de Logs", icon: auditIcon, module: "auditoria" },
+      { href: "/relatorios", label: "Fichas & Relatórios", icon: relatoriosIcon, module: "relatorios" },
+      { href: "/power-bi", label: "Power BI", icon: relatoriosIcon, module: "power-bi" },
+      { href: "/configuracoes", label: "Configurações Globais", icon: configIcon, module: "configuracoes" },
+    ],
+  },
 ];
 
 export default function Sidebar() {
   const path = usePathname();
   const { session } = useAuth();
-  const canSeeTenantAdmin = session?.role === "ADMIN_GLOBAL" || session?.role === "ADMIN_EMPRESA";
-  const visibleNav = nav.map((group) => ({
-    ...group,
-    items: group.items.filter((item) => canAccessModule(session, item.module)),
-  })).filter((group) => group.items.length > 0);
+  const visibleNav = nav
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => canAccessModule(session, item.module) && (!item.tenantAdminOnly || session?.role === "ADMIN_GLOBAL" || session?.role === "ADMIN_EMPRESA")),
+    }))
+    .filter((group) => group.items.length > 0);
 
   return (
     <aside className="hidden md:flex fixed left-0 top-0 h-full w-72 bg-[#0d1420] border-r border-[#1f334d] z-40 flex-col overflow-y-auto custom-scrollbar">
@@ -74,22 +125,6 @@ export default function Sidebar() {
               {group.items.map((item) => {
                 const active = path === item.href || (item.href !== "/" && path.startsWith(item.href));
                 return (
-                  <Link key={item.href} href={item.href} className={`flex items-center gap-4 px-5 py-3.5 rounded-2xl text-[14px] transition-all duration-300 group ${active ? "sidebar-item-active font-black shadow-lg" : "text-[#4a6a8a] hover:text-[#c8d8e8] hover:bg-[#101b2d] hover:translate-x-1"}`}>
-                    <span className={`flex-shrink-0 transition-colors ${active ? "" : "group-hover:text-[#00d4ff]"}`}>{item.icon}</span>
-                    <span className="tracking-tight leading-tight">{item.label}</span>
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-        {canSeeTenantAdmin && (
-          <div className="space-y-3">
-            <p className="text-[#4a6a8a] text-[12px] font-black tracking-[0.22em] uppercase px-4 opacity-45">ADMINISTRAÇÃO</p>
-            <div className="space-y-1.5">
-              {tenantAdminNav.map((item) => {
-                const active = path === item.href || (item.href !== "/" && path.startsWith(item.href));
-                return (
                   <Link
                     key={item.href}
                     href={item.href}
@@ -102,7 +137,7 @@ export default function Sidebar() {
               })}
             </div>
           </div>
-        )}
+        ))}
       </nav>
 
       <div className="p-5 m-5 bg-[#101b2d] border border-[#1f334d] rounded-[22px] flex items-center gap-4 shadow-xl">
@@ -116,4 +151,3 @@ export default function Sidebar() {
     </aside>
   );
 }
-

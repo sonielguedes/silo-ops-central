@@ -54,7 +54,10 @@ export type ModuleName =
   | "relatorios"
   | "power-bi"
   | "auditoria"
-  | "configuracoes";
+  | "configuracoes"
+  | "cadastros_operacionais"
+  | "telemetria_eventos"
+  | "sistema_relatorios";
 
 export interface SessionPayload {
   email: string;
@@ -134,11 +137,11 @@ export const USER_SEEDS: UserSeed[] = [
 
 const ROLE_MODULE_ACCESS: Record<Role, ModuleName[] | "*"> = {
   ADMIN_GLOBAL: "*",
-  ADMIN_EMPRESA: ["dashboard", "mapa", "operacoes", "equipamentos", "operadores", "fazendas", "telemetria", "eventos", "alertas", "sincronizacao", "configuracoes-op", "relatorios", "power-bi", "auditoria", "configuracoes"],
-  GESTOR_USINA: ["dashboard", "mapa", "operacoes", "equipamentos", "telemetria", "eventos", "alertas", "sincronizacao", "relatorios"],
-  GESTOR_UNIDADE: ["dashboard", "mapa", "operacoes", "equipamentos", "telemetria", "eventos", "alertas", "relatorios"],
-  COA: ["dashboard", "mapa", "operacoes", "equipamentos", "telemetria", "eventos", "alertas", "relatorios"],
-  VIEWER: ["dashboard", "mapa", "operacoes", "equipamentos", "telemetria", "eventos", "alertas", "relatorios", "power-bi"],
+  ADMIN_EMPRESA: ["dashboard", "mapa", "operacoes", "equipamentos", "operadores", "fazendas", "telemetria", "eventos", "alertas", "sincronizacao", "configuracoes-op", "relatorios", "power-bi", "auditoria", "configuracoes", "cadastros_operacionais", "telemetria_eventos", "sistema_relatorios"],
+  GESTOR_USINA: ["dashboard", "mapa", "operacoes", "equipamentos", "operadores", "telemetria", "eventos", "alertas", "sincronizacao", "relatorios", "cadastros_operacionais", "telemetria_eventos", "sistema_relatorios"],
+  GESTOR_UNIDADE: ["dashboard", "mapa", "operacoes", "equipamentos", "operadores", "telemetria", "eventos", "alertas", "relatorios", "cadastros_operacionais", "telemetria_eventos", "sistema_relatorios"],
+  COA: ["dashboard", "mapa", "operacoes", "equipamentos", "operadores", "telemetria", "eventos", "alertas", "relatorios", "cadastros_operacionais", "telemetria_eventos", "sistema_relatorios"],
+  VIEWER: ["dashboard", "mapa", "operacoes", "equipamentos", "operadores", "telemetria", "eventos", "alertas", "relatorios", "power-bi", "cadastros_operacionais", "telemetria_eventos", "sistema_relatorios"],
   OPERADOR_APK: [],
 };
 
@@ -158,6 +161,9 @@ const DEFAULT_MODULE_PERMISSIONS: Record<ModuleName, string[]> = {
   "power-bi": ["view"],
   auditoria: ["view"],
   configuracoes: ["view"],
+  cadastros_operacionais: ["view"],
+  telemetria_eventos: ["view"],
+  sistema_relatorios: ["view"],
 };
 
 const ROLE_ALIASES: Record<string, Role> = {
