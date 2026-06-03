@@ -5,12 +5,13 @@ import { filterItemsBySessionScope, isAdminGlobal } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = requireSession(req);
   if (!session) return unauthorized();
 
+  const { id } = await params;
   const store = await readOperationRegistryStore();
-  const item = store.paradas.find(it => it.id === params.id);
+  const item = store.paradas.find(it => it.id === id);
 
   if (!item) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
@@ -20,7 +21,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   return NextResponse.json(item, { status: 200 });
 }
 
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = requireSession(req);
   if (!session) return unauthorized();
 
@@ -30,8 +31,9 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   const body = await readJsonBody(req);
   if (!body) return NextResponse.json({ error: "invalid_payload" }, { status: 400 });
 
+  const { id } = await params;
   const store = await readOperationRegistryStore();
-  const existing = store.paradas.find(it => it.id === params.id);
+  const existing = store.paradas.find(it => it.id === id);
   if (!existing) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
   // Tenant check
@@ -42,7 +44,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   try {
     const item = await upsertParada({
       ...body,
-      id: params.id,
+      id: id,
       empresa_id: existing.empresa_id,
     });
     return NextResponse.json({ ok: true, item }, { status: 200 });
