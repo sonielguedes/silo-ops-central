@@ -215,17 +215,14 @@ test("operations page does not slice nullable API fields directly", () => {
   assert.match(source, /Status operacional/);
 });
 
-test("operators page blocks demo writes and supports localStorage CRUD", () => {
+test("operators page exposes workforce CRUD", () => {
   const source = readFileSync(new URL("../src/app/operadores/page.tsx", import.meta.url), "utf8");
 
-  assert.match(source, /useAuth/);
-  assert.match(source, /Somente ADMIN_GLOBAL e ADMIN_EMPRESA podem criar ou editar operadores\./);
-  assert.match(source, /CAN_LOCAL_OPERADORES_CRUD/);
-  assert.match(source, /readLocalOps/);
-  assert.match(source, /writeLocalOps/);
-  assert.match(source, /Ambiente demonstrativo: cadastro real desativado\./);
-  assert.match(source, /Cadastro salvo somente em localStorage para demonstração\./);
-  assert.match(source, /Falha técnica ao salvar operador\./);
+  assert.match(source, /WorkforceManager/);
+  assert.match(source, /\/api\/admin\/operadores/);
+  assert.match(source, /loadOptions/);
+  assert.match(source, /Matricula/);
+  assert.match(source, /Habilitacoes/);
 });
 
 test("cadastros operacionais placeholder shell exists", () => {
@@ -257,6 +254,23 @@ test("equipment classification registries expose shared store and admin api cont
   assert.match(gruposRoute, /equipment-classification-api/);
   assert.match(perfisRoute, /equipment-classification-api/);
   assert.match(estadosRoute, /equipment-classification-api/);
+});
+
+test("workforce registries expose shared store and admin api contract", () => {
+  assert.equal(existsSync(new URL("../src/lib/workforce-store.ts", import.meta.url)), true);
+  const cargosRoute = readFileSync(new URL("../src/app/api/admin/cargos/route.ts", import.meta.url), "utf8");
+  const cargosIdRoute = readFileSync(new URL("../src/app/api/admin/cargos/[id]/route.ts", import.meta.url), "utf8");
+  const equipesRoute = readFileSync(new URL("../src/app/api/admin/equipes/route.ts", import.meta.url), "utf8");
+  const equipesIdRoute = readFileSync(new URL("../src/app/api/admin/equipes/[id]/route.ts", import.meta.url), "utf8");
+  const operadoresRoute = readFileSync(new URL("../src/app/api/admin/operadores/route.ts", import.meta.url), "utf8");
+  const operadoresIdRoute = readFileSync(new URL("../src/app/api/admin/operadores/[id]/route.ts", import.meta.url), "utf8");
+
+  assert.match(cargosRoute, /workforce-api/);
+  assert.match(cargosIdRoute, /workforce-api/);
+  assert.match(equipesRoute, /workforce-api/);
+  assert.match(equipesIdRoute, /workforce-api/);
+  assert.match(operadoresRoute, /workforce-api/);
+  assert.match(operadoresIdRoute, /workforce-api/);
 });
 
 test("api/eventos route returns controlled technical empty payload", () => {
@@ -650,10 +664,10 @@ test("drawer shows separated blocks for presence, operational state and last ope
 
 test("roadmap includes 3.4M as completed", () => {
   const roadmapSource = readFileSync(new URL("../docs/specs/roadmap.md", import.meta.url), "utf8");
-  const specSource = readFileSync(new URL("../docs/specs/SPEC_DRIVEN_DEVELOPMENT.md", import.meta.url), "utf8");
 
   assert.match(roadmapSource, /3\.4M normalizar presen/);
-  assert.match(roadmapSource, /SPEC_DRIVEN_DEVELOPMENT\.md/);
-  assert.match(specSource, /SILO OPS Central/);
-  assert.match(specSource, /Collector/);
+  assert.match(roadmapSource, /mini-spec por fase/);
+  assert.match(roadmapSource, /nao existe documento mestre longo/i);
 });
+
+
