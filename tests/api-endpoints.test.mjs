@@ -142,15 +142,16 @@ test("/api/equipamentos/trail/collect is admin protected and persists trail poin
   assert.equal(existsSync(routePath), true);
 });
 
-test("health proxy reports degraded/down instead of throwing raw upstream failures", () => {
+test("health proxy reports offline/instavel instead of throwing raw upstream failures", () => {
   const healthSource = readFileSync(new URL("../src/app/api/health/route.ts", import.meta.url), "utf8");
 
   assert.match(healthSource, /IS_DEMO/);
-  assert.match(healthSource, /ambiente:\s*"demo"/);
-  assert.match(healthSource, /status:\s*r\.ok\s*\?\s*"ok"\s*:\s*"degraded"/);
-  assert.match(healthSource, /status:\s*"down"/);
-  assert.match(healthSource, /upstream_status:\s*r\.status/);
-  assert.match(healthSource, /console\.error\("\[SIL\] endpoint failed"/);
+  assert.match(healthSource, /"online"/);
+  assert.match(healthSource, /"instavel"/);
+  assert.match(healthSource, /"offline"/);
+  assert.match(healthSource, /ok:\s*true/);
+  assert.match(healthSource, /ok:\s*false/);
+  assert.match(healthSource, /console\.error\("\[SIL\] Health proxy/);
 });
 
 test("map uses configurable equipment icons and menu exposes icon configuration", () => {

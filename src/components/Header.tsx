@@ -1,9 +1,11 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useAuth } from "@/lib/auth-context";
 
+type ApiStatus = "verificando" | "ativa" | "instavel" | "inativa";
+
 export default function Header({ title, sub }: { title: string; sub?: string }) {
-  const [apiOk, setApiOk] = useState<boolean | null>(null);
+  const [apiStatus, setApiStatus] = useState<ApiStatus>("verificando");
   const [apiCheckTime, setApiCheckTime] = useState("");
   const [currentTime, setCurrentTime] = useState("");
   const [currentDate, setCurrentDate] = useState("");
@@ -11,6 +13,8 @@ export default function Header({ title, sub }: { title: string; sub?: string }) 
   const [empresa, setEmpresa] = useState(session?.empresa_id || "SILOOPS");
   const [usina, setUsina] = useState(session?.usinas[0] || "*");
   const [unidade, setUnidade] = useState(session?.unidades[0] || "*");
+
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     const update = () => {
@@ -25,19 +29,46 @@ export default function Header({ title, sub }: { title: string; sub?: string }) 
 
   useEffect(() => {
     const check = async () => {
+      if (abortControllerRef.current) abortControllerRef.current.abort();
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+
       try {
         const savedUrl = localStorage.getItem("sil_api_base_url");
         const url = savedUrl ? `${savedUrl.trim().replace(/\/$/, "")}/health` : "/api/health";
-        const r = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(5000) });
-        setApiOk(r.ok);
+
+        const r = await fetch(url, {
+          cache: "no-store",
+          signal: controller.signal
+        });
+
+        if (!r.ok) {
+           setApiStatus("inativa");
+        } else {
+           const data = await r.json().catch(() => ({ ok: false }));
+           if (data.ok) {
+             setApiStatus("ativa");
+           } else if (data.status === "instavel") {
+             setApiStatus("instavel");
+           } else {
+             setApiStatus("inativa");
+           }
+        }
         setApiCheckTime(new Date().toLocaleTimeString("pt-BR"));
-      } catch {
-        setApiOk(false);
+      } catch (err: any) {
+        if (err.name === "AbortError") return;
+        setApiStatus("inativa");
+        setApiCheckTime(new Date().toLocaleTimeString("pt-BR"));
       }
     };
+
     check();
     const id = setInterval(check, 30000);
-    return () => clearInterval(id);
+
+    return () => {
+      clearInterval(id);
+      if (abortControllerRef.current) abortControllerRef.current.abort();
+    };
   }, []);
 
   useEffect(() => {
@@ -46,6 +77,15 @@ export default function Header({ title, sub }: { title: string; sub?: string }) 
     setUsina(session.usinas[0] || "*");
     setUnidade(session.unidades[0] || "*");
   }, [session]);
+
+  const statusConfig = {
+    verificando: { label: "Verificando...", color: "text-[#4a6a8a]", bg: "bg-[#4a6a8a]" },
+    ativa: { label: "API ativa", color: "text-[#22c55e]", bg: "bg-[#22c55e] pulse-green shadow-[0_0_10px_rgba(34,197,94,0.4)]" },
+    instavel: { label: "API instável", color: "text-[#ffab00]", bg: "bg-[#ffab00] animate-pulse" },
+    inativa: { label: "API inativa", color: "text-[#ef4444]", bg: "bg-[#ef4444]" },
+  };
+
+  const currentStatus = statusConfig[apiStatus];
 
   return (
     <header className="h-20 flex items-center justify-between px-8 sticky top-0 z-30 bg-[#07111f]/60 backdrop-blur-xl border-b border-[#1f334d]/50">
@@ -87,12 +127,12 @@ export default function Header({ title, sub }: { title: string; sub?: string }) 
         </div>
 
         <div className="flex items-center gap-3">
-          <div className={`w-2.5 h-2.5 rounded-full ${apiOk ? "bg-[#22c55e] pulse-green shadow-[0_0_10px_rgba(34,197,94,0.4)]" : "bg-[#ef4444]"}`} />
+          <div className={`w-2.5 h-2.5 rounded-full ${currentStatus.bg}`} />
           <div className="flex flex-col">
-            <span className={`text-[10px] font-black uppercase tracking-widest ${apiOk ? "text-[#22c55e]" : "text-[#ef4444]"}`}>
-              {apiOk ? "API ativa" : "API inativa"}
+            <span className={`text-[10px] font-black uppercase tracking-widest ${currentStatus.color}`}>
+              {currentStatus.label}
             </span>
-            <span className="text-[#4a6a8a] text-[9px] font-bold">Verificação: {apiCheckTime || "--:--"}</span>
+            <span className="text-[#4a6a8a] text-[9px] font-bold">Check: {apiCheckTime || "--:--"}</span>
           </div>
         </div>
 
