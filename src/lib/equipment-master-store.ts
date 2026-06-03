@@ -67,6 +67,13 @@ export interface EquipmentMasterInput {
   unidade_id?: string;
 }
 
+export interface EquipmentMasterLookup {
+  trator_id: string;
+  empresa_id?: string;
+  usina_id?: string;
+  unidade_id?: string;
+}
+
 const STATUS_VALUES: EquipmentMasterStatus[] = ["ATIVO", "INATIVO", "MANUTENCAO", "BLOQUEADO"];
 const UNIT_VALUES: EquipmentMasterUnitMeasure[] = ["HORA", "KM", "HA", "CICLO"];
 const EMPTY_STORE: EquipmentMasterStore = { items: [], updated_at: new Date(0).toISOString() };
@@ -294,6 +301,55 @@ function assertRequiredInput(input: EquipmentMasterInput) {
 
 function compositeKey(item: Pick<EquipmentMasterRecord, "empresa_id" | "usina_id" | "unidade_id" | "trator_id">) {
   return [item.empresa_id, item.usina_id, item.unidade_id, item.trator_id].join("|");
+}
+
+function normalizeLookupScope(lookup: EquipmentMasterLookup) {
+  const scopeValue = (value: string | undefined, fallback: string) => {
+    const normalized = toText(value, "");
+    if (!normalized || normalized === "*") return fallback;
+    return normalized;
+  };
+  return {
+    empresa_id: scopeValue(lookup.empresa_id, "SILOOPS"),
+    usina_id: scopeValue(lookup.usina_id, "USINA_PADRAO"),
+    unidade_id: scopeValue(lookup.unidade_id, "UNIDADE_PADRAO"),
+  };
+}
+
+export function findEquipmentMasterRecord(items: EquipmentMasterRecord[], lookup: EquipmentMasterLookup, session?: SessionPayload | null) {
+  const target = {
+    trator_id: toText(lookup.trator_id, ""),
+    ...normalizeLookupScope(lookup),
+  };
+  const scoped = listAccessibleEquipmentMaster(items, session || null);
+  return scoped.find((item) => compositeKey(item) === compositeKey(target)) || scoped.find((item) => item.trator_id === target.trator_id) || null;
+}
+
+export function enrichEquipmentStatusWithMaster<T extends Record<string, unknown>>(statusItem: T, master: EquipmentMasterRecord | null) {
+  if (!master) {
+    return {
+      ...statusItem,
+      master: typeof (statusItem as { master?: unknown }).master === "boolean" ? (statusItem as { master?: boolean }).master : false,
+      cadastro_status: (statusItem as { cadastro_status?: unknown }).cadastro_status || "NAO_CADASTRADO",
+    };
+  }
+
+  return {
+    ...statusItem,
+    trator_id: master.trator_id,
+    nome: master.nome,
+    tipo_equipamento: master.tipo_equipamento,
+    modelo: master.modelo,
+    grupo: master.grupo,
+    perfil: master.perfil,
+    status: master.status,
+    empresa_id: master.empresa_id,
+    usina_id: master.usina_id,
+    unidade_id: master.unidade_id,
+    master: true,
+    tem_telemetria: true,
+    cadastro_status: "CADASTRADO",
+  };
 }
 
 function assertCompositeUnique(items: EquipmentMasterRecord[], candidate: EquipmentMasterRecord) {

@@ -68,11 +68,15 @@ if (existsSync(storeFsPath)) {
       const upsertFn = mod.upsertEquipmentMaster ?? mod.upsertEquipment ?? mod.upsertItem;
       const normalizeFn = mod.normalizeEquipmentMasterInput ?? mod.normalizeEquipmentInput;
       const filterFn = mod.filterEquipmentMasterBySession ?? mod.listAccessibleEquipmentMaster;
+      const findFn = mod.findEquipmentMasterRecord ?? mod.resolveEquipmentMasterRecord ?? mod.getEquipmentMasterByScope;
+      const mergeFn = mod.enrichEquipmentStatusWithMaster ?? mod.mergeEquipmentMasterStatus;
 
       assert.equal(typeof readFn, "function");
       assert.equal(typeof upsertFn, "function");
       assert.equal(typeof normalizeFn, "function");
       assert.equal(typeof filterFn, "function");
+      assert.equal(typeof findFn, "function");
+      assert.equal(typeof mergeFn, "function");
 
       const normalized = normalizeFn({
         trator_id: "  T99  ",
@@ -95,6 +99,30 @@ if (existsSync(storeFsPath)) {
       assert.ok(Array.isArray(initial.items));
       assert.match(JSON.stringify(initial.items), /T01/);
       assert.match(JSON.stringify(initial.items), /T02/);
+      const t01 = findFn(initial.items, {
+        trator_id: "T01",
+        empresa_id: "SILOOPS",
+        usina_id: "USINA_PADRAO",
+        unidade_id: "UNIDADE_PADRAO",
+      }, { role: "ADMIN_GLOBAL", empresa_id: "SILOOPS", usinas: ["*"], unidades: ["*"] });
+      assert.equal(t01?.id, "T01");
+      const t01Wildcard = findFn(initial.items, {
+        trator_id: "T01",
+        empresa_id: "*",
+        usina_id: "*",
+        unidade_id: "*",
+      }, { role: "ADMIN_GLOBAL", empresa_id: "SILOOPS", usinas: ["*"], unidades: ["*"] });
+      assert.equal(t01Wildcard?.id, "T01");
+      const mergedT01 = mergeFn({
+        trator_id: "T01",
+        nome: "Não cadastrado",
+        tipo_equipamento: "TRATOR",
+        cadastro_status: "NAO_CADASTRADO",
+        master: false,
+      }, t01);
+      assert.equal(mergedT01.cadastro_status, "CADASTRADO");
+      assert.equal(mergedT01.master, true);
+      assert.equal(mergedT01.nome, t01.nome);
 
       const created = await upsertFn({
         trator_id: "T99",

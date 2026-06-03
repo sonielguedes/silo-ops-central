@@ -1,6 +1,7 @@
 import { IS_DEMO, SITE_URL } from "@/lib/app-env";
 import { normalizeEquipmentList } from "@/lib/api";
 import { filterItemsBySessionScope, normalizeScopeFields, type SessionPayload } from "@/lib/auth";
+import { enrichEquipmentStatusWithMaster, findEquipmentMasterRecord, readEquipmentMasterStore } from "@/lib/equipment-master-store";
 import { enrichTrailPointWithOperationalContext, fetchEquipmentStatusSnapshot } from "@/lib/equipment-status-trail";
 import { normalizeEquipmentState } from "@/lib/equipment-state";
 import { queryEquipmentTrailPoints } from "@/lib/equipment-trail-store";
@@ -268,19 +269,59 @@ export async function buildEquipmentDetails(tratorId: string, session: SessionPa
       .filter((item) => item.trator_id),
     session,
   );
+  const masterStore = await readEquipmentMasterStore();
   const statusItem = statusItems.find((item) => item.trator_id === tratorId) || null;
-  const cadastroStatus = (statusItem?.cadastro_status as EquipmentDetails["cadastro_status"]) || (statusItem ? "CADASTRADO" : "DESCONHECIDO");
+  const master = findEquipmentMasterRecord(masterStore.items, {
+    trator_id: tratorId,
+    empresa_id: statusItem?.empresa_id as string | undefined,
+    usina_id: statusItem?.usina_id as string | undefined,
+    unidade_id: statusItem?.unidade_id as string | undefined,
+  }, session || null);
+  const cadastroStatus = master ? (statusItem ? "CADASTRADO" : "SEM_TELEMETRIA") : ((statusItem?.cadastro_status as EquipmentDetails["cadastro_status"]) || (statusItem ? "NAO_CADASTRADO" : "DESCONHECIDO"));
   const opItem = applyScope(operacoes.filter((item) => item.trator_id === tratorId), session);
   const eventItems = applyScope([...eventos, ...recentes].filter((item) => item.trator_id === tratorId || item.operacao_id === statusItem?.operacao_id), session);
   const trailItem = trail.length > 0 ? enrichTrailPointWithOperationalContext(trail[trail.length - 1]) : null;
 
-  if (!statusItem && !opItem[0] && !trailItem && eventItems.length === 0) {
+  if (!statusItem && !master && !opItem[0] && !trailItem && eventItems.length === 0) {
     return null;
   }
 
   const op = latestByTimestamp(opItem);
   const event = latestByTimestamp(eventItems);
-  const base = statusItem || ({
+  const statusBase = statusItem ? enrichEquipmentStatusWithMaster(statusItem, master) : null;
+  const base = statusBase || (master ? {
+    trator_id: master.trator_id,
+    nome: master.nome,
+    tipo_equipamento: master.tipo_equipamento,
+    modelo: master.modelo,
+    grupo: master.grupo,
+    perfil: master.perfil,
+    status: master.status,
+    presence: null,
+    estado_operacional: null,
+    operacao_id: null,
+    operacao_nome: null,
+    descricao_operacao: null,
+    codigo_parada: null,
+    descricao_parada: null,
+    velocidade: null,
+    operador: null,
+    comunicacao: null,
+    latitude: null,
+    longitude: null,
+    bateria: null,
+    fazenda: null,
+    frente: null,
+    talhao: null,
+    zona: null,
+    updated_at: master.updated_at,
+    evento_status: null,
+    motivo_status: null,
+    cadastro_status: "SEM_TELEMETRIA",
+    empresa_id: master.empresa_id,
+    usina_id: master.usina_id,
+    unidade_id: master.unidade_id,
+  } as NormalizedStatus : {
     trator_id: tratorId,
     cadastro_status: cadastroStatus,
     status: null,
