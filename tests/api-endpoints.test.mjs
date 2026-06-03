@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 const apiSource = readFileSync(new URL("../src/lib/api.ts", import.meta.url), "utf8");
@@ -193,10 +194,12 @@ test("equipment list exposes direct trail navigation on each row", () => {
   const trailIndexSource = readFileSync(new URL("../src/app/equipamentos/rastro/page.tsx", import.meta.url), "utf8");
 
   assert.match(equipmentsSource, /Ver Rastro/);
-  assert.match(equipmentsSource, /\/equipamentos\/\$\{eq\.trator_id\}\/rastro/);
-  assert.match(equipmentsSource, /EquipmentDetailsDrawer/);
-  assert.match(equipmentsSource, /selectedId/);
-  assert.match(equipmentsSource, /open=\{Boolean\(selectedId\)\}/);
+  assert.match(equipmentsSource, /\/equipamentos\/\$\{row\.id\}\/rastro/);
+  assert.match(equipmentsSource, /EquipmentRegistryModal/);
+  assert.match(equipmentsSource, /mergeEquipments/);
+  assert.match(equipmentsSource, /Sem telemetria/);
+  assert.match(equipmentsSource, /Nao cadastrado/);
+  assert.match(equipmentsSource, /Cadastro mestre/);
   assert.match(trailIndexSource, /Rastro dos Equipamentos/);
   assert.match(trailIndexSource, /Ver rastro/);
   assert.match(trailIndexSource, /Último sinal/);

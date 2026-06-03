@@ -1,21 +1,21 @@
 # Cadastros Operacionais
 
-Status: implementado em base híbrida
+Status: implementado em base hibrida
 
 ## Objetivo
-Reorganizar a navegação do SILO OPS para concentrar cadastros agrícolas e operacionais em um grupo único, sem quebrar rotas antigas, mapa, rastro, drawer, collector ou APIs existentes.
+Reorganizar a navegacao do SILO OPS para concentrar cadastros agricolas e operacionais em um grupo unico, sem quebrar rotas antigas, mapa, rastro, drawer, collector ou APIs existentes. Essa fase tambem serve como base do cadastro mestre de equipamentos.
 
 ## Estrutura
 - Monitoramento
 - Cadastros Operacionais
 - Telemetria & Eventos
-- Sistema & Relatórios
+- Sistema & Relatorios
 
 ## Regras de acesso
-- `VIEWER` navega em páginas de leitura.
-- `ADMIN_GLOBAL` e `ADMIN_EMPRESA` mantêm acesso administrativo onde já existia.
-- Rotas antigas continuam válidas.
-- Rotas novas entram como placeholders funcionais até a implementação real.
+- `VIEWER` navega em paginas de leitura.
+- `ADMIN_GLOBAL` e `ADMIN_EMPRESA` mantem acesso administrativo onde ja existia.
+- Rotas antigas continuam validas.
+- Rotas novas entram como placeholders funcionais ate a implementacao real.
 
 ## Rotas novas
 - `/cadastros/equipamentos/tipos`
@@ -35,15 +35,17 @@ Reorganizar a navegação do SILO OPS para concentrar cadastros agrícolas e ope
 - `/comando-online`
 
 ## Compatibilidade
-- O menu antigo foi reagrupado, não eliminado.
-- O módulo de operadores continua disponível com leitura para perfis permitidos e edição restrita a perfis administrativos.
+- O menu antigo foi reagrupado, nao eliminado.
+- O modulo de operadores continua disponivel com leitura para perfis permitidos e edicao restrita a perfis administrativos.
 - `admin/empresas`, `admin/usinas`, `admin/unidades` e `admin/usuarios` seguem protegidos pelo controle de tenant.
+- O CRUD administrativo de equipamentos entra como dominio paralelo ao menu, com store JSON server-side e integracao futura com `/equipamentos`.
+- A visao operacional de `/equipamentos` continua sendo a camada de telemetria, mas vai combinar cadastro mestre + status quando o registry estiver ativo.
 
-## Implementação visual
+## Implementacao visual
 - Shell SILO OPS dark industrial.
-- Cards de preparação.
+- Cards de preparacao.
 - Layout responsivo.
-- Sem alteração de contratos de API existentes.
+- Sem alteracao de contratos de API existentes.
 
-## Observação
-Este documento registra a estrutura operacional atual e serve como base para os próximos cadastros reais em JSON server-side e futura migração para banco.
+## Observacao
+Este documento registra a estrutura operacional atual e serve como base para os proximos cadastros reais em JSON server-side e futura migracao para banco. O cadastro mestre de equipamentos fica nessa trilha e nao substitui os placeholders ja publicados.

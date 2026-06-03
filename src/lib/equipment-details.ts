@@ -12,6 +12,7 @@ export type EquipmentDetails = {
   trator_id: string;
   nome_equipamento: string | null;
   tipo_equipamento: EquipmentType;
+  cadastro_status: "CADASTRADO" | "SEM_TELEMETRIA" | "NAO_CADASTRADO" | "DESCONHECIDO" | null;
   presence: string | null;
   status: string | null;
   estado_operacional: string | null;
@@ -65,6 +66,7 @@ type NormalizedStatus = Record<string, unknown> & {
   updated_at?: string | null;
   evento_status?: string | null;
   motivo_status?: string | null;
+  cadastro_status?: string | null;
 };
 
 type NormalizedOperation = Record<string, unknown> & {
@@ -267,6 +269,7 @@ export async function buildEquipmentDetails(tratorId: string, session: SessionPa
     session,
   );
   const statusItem = statusItems.find((item) => item.trator_id === tratorId) || null;
+  const cadastroStatus = (statusItem?.cadastro_status as EquipmentDetails["cadastro_status"]) || (statusItem ? "CADASTRADO" : "DESCONHECIDO");
   const opItem = applyScope(operacoes.filter((item) => item.trator_id === tratorId), session);
   const eventItems = applyScope([...eventos, ...recentes].filter((item) => item.trator_id === tratorId || item.operacao_id === statusItem?.operacao_id), session);
   const trailItem = trail.length > 0 ? enrichTrailPointWithOperationalContext(trail[trail.length - 1]) : null;
@@ -279,6 +282,7 @@ export async function buildEquipmentDetails(tratorId: string, session: SessionPa
   const event = latestByTimestamp(eventItems);
   const base = statusItem || ({
     trator_id: tratorId,
+    cadastro_status: cadastroStatus,
     status: null,
     presence: null,
     estado_operacional: null,
@@ -320,10 +324,11 @@ export async function buildEquipmentDetails(tratorId: string, session: SessionPa
 
   const rawDetails = {
     trator_id: tratorId,
-    nome_equipamento: text(base.nome ?? base.modelo ?? base.descricao ?? tratorId),
+    nome_equipamento: text(base.nome ?? base.modelo ?? base.descricao ?? (cadastroStatus === "NAO_CADASTRADO" ? "Não cadastrado" : cadastroStatus === "SEM_TELEMETRIA" ? "Sem telemetria" : tratorId)),
     tipo_equipamento: type,
+    cadastro_status: cadastroStatus,
     presence: base.presence || null,
-    status: base.status || op?.status || null,
+    status: base.status || op?.status || (cadastroStatus === "SEM_TELEMETRIA" ? "Sem telemetria" : cadastroStatus === "NAO_CADASTRADO" ? "Não cadastrado" : null),
     estado_operacional: trailItem?.estado_operacional || base.estado_operacional || null,
     operacao_id: op?.operacao_id || base.operacao_id || event?.operacao_id || null,
     operacao_nome: op?.operacao_atual || op?.status || base.operacao_nome || null,
@@ -332,7 +337,7 @@ export async function buildEquipmentDetails(tratorId: string, session: SessionPa
     descricao_parada: trailItem?.descricao_parada || base.descricao_parada || event?.descricao_parada || null,
     velocidade: trailItem?.velocidade ?? op?.velocidade_atual ?? base.velocidade ?? null,
     operador: op?.nome_operador || base.operador || null,
-    comunicacao: base.comunicacao || (base.presence ? `Presença ${base.presence}` : null),
+    comunicacao: base.comunicacao || (base.presence ? `Presença ${base.presence}` : cadastroStatus === "SEM_TELEMETRIA" ? "Sem telemetria" : cadastroStatus === "NAO_CADASTRADO" ? "Não cadastrado" : null),
     latitude: trailItem?.latitude ?? base.latitude ?? null,
     longitude: trailItem?.longitude ?? base.longitude ?? null,
     bateria: op?.bateria ?? base.bateria ?? null,
@@ -369,5 +374,6 @@ export async function buildEquipmentDetails(tratorId: string, session: SessionPa
     operacao_atual: normalized.operacao_atual,
     ultima_operacao_conhecida: normalized.ultima_operacao_conhecida,
     status_resumo: normalized.status_resumo,
+    cadastro_status: cadastroStatus,
   };
 }

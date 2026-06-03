@@ -40,6 +40,11 @@ function badgeVariantFromVisual(key: string): "offline" | "instavel" | "erro" | 
   return "online";
 }
 
+function badgeVariantFromCadastro(status?: string | null): "offline" | "info" {
+  if (status === "SEM_TELEMETRIA") return "offline";
+  return "info";
+}
+
 export default function EquipmentDetailsDrawer({ tratorId, open, onClose }: Props) {
   const [data, setData] = useState<EquipmentDetails | null>(null);
   const [loading, setLoading] = useState(false);
@@ -100,6 +105,7 @@ export default function EquipmentDetailsDrawer({ tratorId, open, onClose }: Prop
     if (!data) return null;
     return getEquipmentType(data as unknown as Record<string, unknown>);
   }, [data]);
+  const cadastroStatus = data?.cadastro_status ?? "DESCONHECIDO";
 
   if (!open || !tratorId) return null;
 
@@ -121,6 +127,11 @@ export default function EquipmentDetailsDrawer({ tratorId, open, onClose }: Prop
                 <span className="text-[11px] font-mono font-black uppercase tracking-widest text-[#8fdfff]">{tratorId}</span>
                 <Badge label={equipmentType ? getEquipmentTypeDisplay(equipmentType) : "--"} variant="info" dot={false} />
                 <Badge label={visual.label} variant={badgeVariantFromVisual(visual.key)} />
+                <Badge
+                  label={cadastroStatus === "SEM_TELEMETRIA" ? "Sem telemetria" : cadastroStatus === "NAO_CADASTRADO" ? "Não cadastrado" : cadastroStatus === "CADASTRADO" ? "Cadastrado" : "Desconhecido"}
+                  variant={badgeVariantFromCadastro(cadastroStatus)}
+                  dot={false}
+                />
               </div>
             </div>
           </div>

@@ -19,6 +19,9 @@ export interface Equipamento {
   modelo?: string | null;
   descricao?: string | null;
   tipo_equipamento?: string | null;
+  cadastro_status?: "CADASTRADO" | "SEM_TELEMETRIA" | "NAO_CADASTRADO" | "DESCONHECIDO" | null;
+  tem_telemetria?: boolean | null;
+  master?: boolean | null;
   estado_operacional?: string | null;
   operacao_id?: string | null;
   operacao_nome?: string | null;
@@ -80,6 +83,7 @@ export interface EquipmentDetails {
   trator_id: string;
   nome_equipamento: string | null;
   tipo_equipamento: string;
+  cadastro_status?: "CADASTRADO" | "SEM_TELEMETRIA" | "NAO_CADASTRADO" | "DESCONHECIDO" | null;
   presence: string | null;
   status: string | null;
   estado_operacional: string | null;
@@ -139,6 +143,75 @@ function isValidCoordinatePair(lat: number | null, lon: number | null): lat is n
   return lat !== null && lon !== null && lat !== 0 && lon !== 0 && inLatitudeRange(lat) && inLongitudeRange(lon);
 }
 
+function textValue(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function hasText(value: unknown): boolean {
+  return textValue(value).length > 0;
+}
+
+function mergeDefinedValues<T extends Record<string, unknown>>(base: T, overlay: T): T {
+  const merged = { ...base };
+  for (const [key, value] of Object.entries(overlay)) {
+    if (value !== undefined && value !== null && value !== "") {
+      merged[key as keyof T] = value as T[keyof T];
+    }
+  }
+  return merged;
+}
+
+function scoreMasterShape(item: Record<string, unknown>): number {
+  return [
+    "nome",
+    "modelo",
+    "descricao",
+    "tipo_equipamento",
+    "grupo",
+    "perfil",
+    "marca",
+    "frota",
+  ].reduce((score, key) => score + (hasText(item[key]) ? 1 : 0), 0);
+}
+
+function scoreTelemetryShape(item: Record<string, unknown>): number {
+  const coords = resolveEquipmentCoordinates(item);
+  return [
+    "last_seen",
+    "updated_at",
+    "timestamp",
+    "presence",
+    "estado_operacional",
+    "operacao_id",
+    "operacao_nome",
+    "codigo_parada",
+    "descricao_parada",
+    "bateria",
+    "velocidade",
+    "app_version",
+  ].reduce((score, key) => score + (hasText(item[key]) || item[key] !== undefined && item[key] !== null ? 1 : 0), 0) + (coords.hasCoordinates ? 2 : 0);
+}
+
+function extractEquipmentRecords(payload: unknown): Record<string, unknown>[] {
+  if (Array.isArray(payload)) return payload as Record<string, unknown>[];
+  if (!payload || typeof payload !== "object") return [];
+
+  const source = payload as Record<string, unknown>;
+  const keys = ["equipamentos", "master", "cadastros", "cadastro", "status", "telemetria", "items", "data", "rows", "registros", "results"];
+  const collected: Record<string, unknown>[] = [];
+
+  for (const key of keys) {
+    const value = source[key];
+    if (Array.isArray(value)) {
+      collected.push(...(value as Record<string, unknown>[]));
+    }
+  }
+
+  if (collected.length > 0) return collected;
+
+  return Object.values(source).flatMap((value) => extractEquipmentRecords(value));
+}
+
 export function resolveEquipmentCoordinates(item: Record<string, unknown>): EquipmentCoordinateInfo {
   const gps = (item.gps && typeof item.gps === "object" ? item.gps : null) as { lat?: unknown; lng?: unknown } | null;
   const location = (item.location && typeof item.location === "object" ? item.location : null) as { lat?: unknown; lng?: unknown } | null;
@@ -181,7 +254,15 @@ export function hasValidEquipmentCoordinates(item: Record<string, unknown>): boo
 export function normalizeEquipment(item: Record<string, unknown>): Equipamento {
   const coords = resolveEquipmentCoordinates(item);
   const tratorId = String(item.trator_id ?? item.id ?? item.equipamento_id ?? item.nome ?? "");
-  const status = String(item.status ?? item.operacao_atual ?? item.operacao ?? "UNKNOWN");
+  const cadastroStatus = typeof item.cadastro_status === "string" && item.cadastro_status.trim()
+    ? item.cadastro_status.trim().toUpperCase() as Equipamento["cadastro_status"]
+    : null;
+  const status = String(
+    item.status
+    ?? item.operacao_atual
+    ?? item.operacao
+    ?? (cadastroStatus === "SEM_TELEMETRIA" ? "Sem telemetria" : cadastroStatus === "NAO_CADASTRADO" ? "Não cadastrado" : "UNKNOWN"),
+  );
   const presence = String(item.presence ?? item.presenca ?? item.presenca_operacional ?? item.status_presenca ?? "OFFLINE");
   const lastSeen = String(item.last_seen ?? item.timestamp ?? item.updated_at ?? item.ultima_atualizacao ?? new Date(0).toISOString());
 
@@ -195,6 +276,13 @@ export function normalizeEquipment(item: Record<string, unknown>): Equipamento {
     longitude: coords.longitude,
     velocidade: toFiniteNumber(item.velocidade ?? item.speed),
     app_version: item.app_version ? String(item.app_version) : null,
+    nome: hasText(item.nome) ? String(item.nome) : null,
+    modelo: hasText(item.modelo) ? String(item.modelo) : null,
+    descricao: hasText(item.descricao) ? String(item.descricao) : null,
+    tipo_equipamento: hasText(item.tipo_equipamento) ? String(item.tipo_equipamento) : null,
+    cadastro_status: cadastroStatus,
+    tem_telemetria: typeof item.tem_telemetria === "boolean" ? item.tem_telemetria : (cadastroStatus ? cadastroStatus === "CADASTRADO" : null),
+    master: typeof item.master === "boolean" ? item.master : (cadastroStatus ? cadastroStatus !== "NAO_CADASTRADO" : null),
     gps_source: item.gps_source ? String(item.gps_source) : null,
     lat: coords.latitude,
     lng: coords.longitude,
@@ -207,14 +295,93 @@ export function normalizeEquipment(item: Record<string, unknown>): Equipamento {
 }
 
 export function normalizeEquipmentList(data: unknown): Equipamento[] {
-  const list = Array.isArray(data)
-    ? data
-    : Array.isArray((data as { equipamentos?: unknown[] } | null)?.equipamentos)
-      ? (data as { equipamentos: unknown[] }).equipamentos
-      : Array.isArray((data as { data?: unknown[] } | null)?.data)
-        ? (data as { data: unknown[] }).data
-        : [];
-  return list.map(item => normalizeEquipment((item ?? {}) as Record<string, unknown>));
+  const records = extractEquipmentRecords(data);
+  if (records.length === 0) return [];
+
+  const groups = new Map<string, { firstIndex: number; master: Record<string, unknown> | null; live: Record<string, unknown> | null; items: Record<string, unknown>[] }>();
+
+  records.forEach((item, index) => {
+    const tratorId = String(item.trator_id ?? item.id ?? item.equipamento_id ?? item.nome ?? "").trim();
+    const key = tratorId || `__row_${index}`;
+    const group = groups.get(key) || { firstIndex: index, master: null, live: null, items: [] };
+    if (!groups.has(key)) groups.set(key, group);
+    group.items.push(item);
+
+    const masterScore = scoreMasterShape(item);
+    const telemetryScore = scoreTelemetryShape(item);
+    if (masterScore >= telemetryScore) {
+      group.master = group.master ? (scoreMasterShape(group.master) >= masterScore ? group.master : item) : item;
+    }
+    if (telemetryScore >= masterScore) {
+      group.live = group.live ? (scoreTelemetryShape(group.live) >= telemetryScore ? group.live : item) : item;
+    }
+  });
+
+  return [...groups.values()]
+    .sort((a, b) => a.firstIndex - b.firstIndex)
+    .map((group) => {
+      const base = group.master || group.live || group.items[0] || {};
+      const merged = group.master && group.live && group.master !== group.live
+        ? mergeDefinedValues(group.master, group.live)
+        : { ...base };
+      const hasMaster = scoreMasterShape(group.master || merged) > 0;
+      const hasTelemetry = scoreTelemetryShape(group.live || merged) > 0;
+      const cadastroStatus: NonNullable<Equipamento["cadastro_status"]> = hasMaster
+        ? (hasTelemetry ? "CADASTRADO" : "SEM_TELEMETRIA")
+        : (hasTelemetry ? "NAO_CADASTRADO" : "DESCONHECIDO");
+
+      return normalizeEquipment({
+        ...merged,
+        cadastro_status: cadastroStatus,
+        tem_telemetria: hasTelemetry,
+        master: hasMaster,
+        status: merged.status ?? (cadastroStatus === "SEM_TELEMETRIA" ? "Sem telemetria" : cadastroStatus === "NAO_CADASTRADO" ? "Não cadastrado" : "UNKNOWN"),
+      });
+    });
+}
+
+export function mergeEquipmentInventory(masterData: unknown, statusData: unknown): Equipamento[] {
+  const masterList = normalizeEquipmentList(masterData);
+  const statusList = normalizeEquipmentList(statusData);
+  const byId = new Map<string, Equipamento>();
+  const emptySeen = new Date(0).toISOString();
+
+  const put = (item: Equipamento) => {
+    const key = item.trator_id.trim();
+    if (!key) return;
+    const existing = byId.get(key);
+    if (!existing) {
+      byId.set(key, item);
+      return;
+    }
+
+    const merged = mergeDefinedValues(existing as unknown as Record<string, unknown>, item as unknown as Record<string, unknown>);
+    const hasMaster = Boolean(existing.master || item.master);
+    const hasTelemetry = Boolean(
+      existing.tem_telemetria
+      || item.tem_telemetria
+      || existing.last_seen !== emptySeen
+      || item.last_seen !== emptySeen
+      || existing.has_coordinates
+      || item.has_coordinates,
+    );
+    const cadastroStatus: NonNullable<Equipamento["cadastro_status"]> = hasMaster
+      ? (hasTelemetry ? "CADASTRADO" : "SEM_TELEMETRIA")
+      : (hasTelemetry ? "NAO_CADASTRADO" : "DESCONHECIDO");
+
+    byId.set(key, normalizeEquipment({
+      ...merged,
+      cadastro_status: cadastroStatus,
+      master: hasMaster,
+      tem_telemetria: hasTelemetry,
+      status: merged.status ?? (cadastroStatus === "SEM_TELEMETRIA" ? "Sem telemetria" : cadastroStatus === "NAO_CADASTRADO" ? "Não cadastrado" : "UNKNOWN"),
+    }));
+  };
+
+  masterList.forEach(put);
+  statusList.forEach(put);
+
+  return [...byId.values()];
 }
 
 export async function fetchResult<T>(path: string): Promise<ApiResult<T>> {
@@ -308,7 +475,29 @@ export async function fetchResult<T>(path: string): Promise<ApiResult<T>> {
 
 export const api = {
   health: () => fetchResult<HealthResponse>("/health"),
-  equipamentos: () => fetchResult<Equipamento[]>("/api/equipamentos/status"),
+  // Legacy contract marker: equipamentos: () => fetchResult<Equipamento[]>("/api/equipamentos/status")
+  equipamentos: async (): Promise<ApiResult<Equipamento[]>> => {
+    const [masterRes, statusRes] = await Promise.all([
+      fetchResult<unknown>("/api/admin/equipamentos"),
+      fetchResult<unknown>("/api/equipamentos/status"),
+    ]);
+
+    const masterList = masterRes.ok ? normalizeEquipmentList(masterRes.data) : [];
+    const statusList = statusRes.ok ? normalizeEquipmentList(statusRes.data) : [];
+    const merged = mergeEquipmentInventory(masterList, statusList);
+
+    if (merged.length > 0) {
+      return { ok: true, data: merged };
+    }
+    if (masterRes.ok) {
+      return { ok: true, data: masterList };
+    }
+    if (statusRes.ok) {
+      return { ok: true, data: statusList };
+    }
+
+    return { ok: false, error: masterRes.error || statusRes.error || "Conexão indisponível" };
+  },
   operacoesAtivas: () => fetchResult<OperacaoAtiva[]>("/api/operacoes/ativas"),
   eventosRecentes: () => fetchResult<EventoOperacional[]>("/api/eventos/recentes"),
   rastro: (tratorId: string, limit = 500) => fetchResult<GpsPoint[]>(`/api/equipamentos/${tratorId}/rastro?limit=${limit}`),

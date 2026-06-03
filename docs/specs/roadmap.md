@@ -14,9 +14,16 @@ Registrar a trilha da Fase 3.x com o que ja foi concluido e o que ainda falta.
 - 3.4D coletor automatico
 - 3.4E collector token
 - 3.4F estado operacional no rastro
-- 3.4G navegação do rastro dos equipamentos
-- 3.4M normalizar presença técnica vs estado operacional
-- 3.5 reorganização da sidebar e cadastros operacionais
+- 3.4G navegacao do rastro dos equipamentos
+- 3.4M normalizar presenca tecnica vs estado operacional
+- 3.5 reorganizacao da sidebar e cadastros operacionais
+
+## Em andamento
+- cadastro mestre real de equipamentos
+- store JSON server-side em `/app/data/equipment-master.json`
+- APIs admin `/api/admin/equipamentos` e `/api/admin/equipamentos/[id]`
+- consolidacao de `/equipamentos` como visao master + telemetria
+- estados de merge `Sem telemetria` e `Nao cadastrado`
 
 ## Proximas
 - 3.4H unificar estado operacional Dashboard/Equipamentos/Rastro

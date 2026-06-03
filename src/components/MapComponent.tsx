@@ -106,6 +106,11 @@ export default function MapComponent({
     const typeColor = iconData.color;
     const isOffline = statusTone.key === "OFFLINE";
     const isInstavel = statusTone.key === "INSTAVEL";
+    const cadastroLabel = eq.cadastro_status === "SEM_TELEMETRIA"
+      ? "Sem telemetria"
+      : eq.cadastro_status === "NAO_CADASTRADO"
+        ? "Não cadastrado"
+        : null;
     const compact = zoomLevel < 14;
     const outerWidth = compact ? 62 : 76;
     const outerHeight = compact ? 88 : 102;
@@ -163,6 +168,7 @@ export default function MapComponent({
             <span>${eq.trator_id}</span>
             <span style="color:${statusColor};">${statusTone.short}</span>
             ${compact ? "" : `<span style="color:#7f9bb8;font-size:9px;">${presenceTone.label}</span>`}
+            ${cadastroLabel ? `<span style="color:#9fb3c8;font-size:9px;">${cadastroLabel}</span>` : ""}
           </div>
 
           <!-- Círculo Principal com Ícone -->
