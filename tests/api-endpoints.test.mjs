@@ -31,6 +31,23 @@ test("local proxy route exists for /api/equipamentos/status", () => {
   assert.equal(existsSync(new URL("../src/app/api/equipamentos/status/route.ts", import.meta.url)), true);
 });
 
+test("mobile equipment lookup routes exist with session guard and fleet-code contract", () => {
+  const listRoute = readFileSync(new URL("../src/app/api/mobile/equipamentos/route.ts", import.meta.url), "utf8");
+  const fleetRoute = readFileSync(new URL("../src/app/api/mobile/equipamentos/frota/[frota]/route.ts", import.meta.url), "utf8");
+
+  assert.match(listRoute, /getSessionFromRequest/);
+  assert.match(listRoute, /listActiveEquipmentMaster/);
+  assert.match(listRoute, /readEquipmentMasterStore/);
+
+  assert.match(fleetRoute, /getSessionFromRequest/);
+  assert.match(fleetRoute, /findEquipmentMasterRecordByFrota/);
+  assert.match(fleetRoute, /normalizeInputFrota/);
+  assert.match(fleetRoute, /not_found/);
+  assert.match(fleetRoute, /equipamento_inativo/);
+  assert.equal(existsSync(new URL("../src/app/api/mobile/equipamentos/route.ts", import.meta.url)), true);
+  assert.equal(existsSync(new URL("../src/app/api/mobile/equipamentos/frota/[frota]/route.ts", import.meta.url)), true);
+});
+
 test("equipment trail page and proxy route exist with cookie guard and tenant-safe rendering", () => {
   const pageSource = readFileSync(new URL("../src/app/equipamentos/[tratorId]/rastro/page.tsx", import.meta.url), "utf8");
   const routeSource = readFileSync(new URL("../src/app/api/equipamentos/[tratorId]/rastro/route.ts", import.meta.url), "utf8");
@@ -698,5 +715,4 @@ test("roadmap includes 3.4M as completed", () => {
   assert.match(roadmapSource, /mini-spec por fase/);
   assert.match(roadmapSource, /nao existe documento mestre longo/i);
 });
-
 

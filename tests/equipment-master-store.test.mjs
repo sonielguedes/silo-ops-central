@@ -109,6 +109,32 @@ async function loadDetailsModule(jsonPath) {
   return import(`${detailsUrl}#${Buffer.from(jsonPath).toString("base64")}`);
 }
 
+async function loadMobileRouteModule(kind, jsonPath, session) {
+  const storeModuleUrl = buildStoreModuleUrl(jsonPath);
+  const routePath = kind === "fleet"
+    ? new URL("../src/app/api/mobile/equipamentos/frota/[frota]/route.ts", import.meta.url)
+    : new URL("../src/app/api/mobile/equipamentos/route.ts", import.meta.url);
+  const routeSource = readFileSync(routePath, "utf8")
+    .replace(/from "next\/server"/g, `from "data:text/javascript;base64,${Buffer.from(transpileTs(`
+      export const NextResponse = {
+        json(body, init = {}) {
+          return new Response(JSON.stringify(body), {
+            status: init.status ?? 200,
+            headers: { "content-type": "application/json" },
+          });
+        },
+      };
+    `)).toString("base64")}"`)
+    .replace(/from "@\/lib\/auth"/g, `from "data:text/javascript;base64,${Buffer.from(transpileTs(`
+      export function getSessionFromRequest() {
+        return ${JSON.stringify(session)};
+      }
+    `)).toString("base64")}"`)
+    .replace(/from "@\/lib\/equipment-master-store"/g, `from "${storeModuleUrl}"`);
+  const routeUrl = `data:text/javascript;base64,${Buffer.from(transpileTs(routeSource)).toString("base64")}`;
+  return import(`${routeUrl}#${Buffer.from(kind + jsonPath).toString("base64")}`);
+}
+
 test("equipment master registry docs expose the planned store and admin API contract", () => {
   const roadmap = readFileSync(new URL("../docs/specs/roadmap.md", import.meta.url), "utf8");
   const cadastros = readFileSync(new URL("../docs/specs/cadastros-operacionais.md", import.meta.url), "utf8");
@@ -135,6 +161,9 @@ if (existsSync(storeFsPath)) {
       const filterFn = mod.filterEquipmentMasterBySession ?? mod.listAccessibleEquipmentMaster;
       const findFn = mod.findEquipmentMasterRecord ?? mod.resolveEquipmentMasterRecord ?? mod.getEquipmentMasterByScope;
       const mergeFn = mod.enrichEquipmentStatusWithMaster ?? mod.mergeEquipmentMasterStatus;
+      const findByFrotaFn = mod.findEquipmentMasterRecordByFrota ?? mod.resolveEquipmentMasterByFrota;
+      const listActiveFn = mod.listActiveEquipmentMaster ?? mod.listActiveEquipmentMasterBySession;
+      const normalizeFrotaFn = mod.normalizeFrotaCode ?? mod.normalizeFleetCode;
 
       assert.equal(typeof readFn, "function");
       assert.equal(typeof upsertFn, "function");
@@ -142,6 +171,9 @@ if (existsSync(storeFsPath)) {
       assert.equal(typeof filterFn, "function");
       assert.equal(typeof findFn, "function");
       assert.equal(typeof mergeFn, "function");
+      assert.equal(typeof findByFrotaFn, "function");
+      assert.equal(typeof listActiveFn, "function");
+      assert.equal(typeof normalizeFrotaFn, "function");
 
       const normalized = normalizeFn({
         trator_id: "  T99  ",
@@ -265,10 +297,13 @@ if (existsSync(storeFsPath)) {
         });
       };
 
-      const storeMod = await loadStoreModule(jsonPath);
-      const upsertFn = storeMod.upsertEquipmentMaster ?? storeMod.upsertEquipment ?? storeMod.upsertItem;
-      const readFn = storeMod.readEquipmentMasterStore ?? storeMod.readEquipmentStore ?? storeMod.readStore;
-      const mergeFn = storeMod.enrichEquipmentStatusWithMaster ?? storeMod.mergeEquipmentMasterStatus;
+    const storeMod = await loadStoreModule(jsonPath);
+    const upsertFn = storeMod.upsertEquipmentMaster ?? storeMod.upsertEquipment ?? storeMod.upsertItem;
+    const readFn = storeMod.readEquipmentMasterStore ?? storeMod.readEquipmentStore ?? storeMod.readStore;
+    const mergeFn = storeMod.enrichEquipmentStatusWithMaster ?? storeMod.mergeEquipmentMasterStatus;
+      const findByFrotaFn = storeMod.findEquipmentMasterRecordByFrota ?? storeMod.resolveEquipmentMasterByFrota;
+      const listActiveFn = storeMod.listActiveEquipmentMaster ?? storeMod.listActiveEquipmentMasterBySession;
+      const normalizeFrotaFn = storeMod.normalizeFrotaCode ?? storeMod.normalizeFleetCode;
 
       await upsertFn({
         id: "T01",
@@ -281,10 +316,29 @@ if (existsSync(storeFsPath)) {
         unidade_id: "UNIDADE_PADRAO",
       });
 
+      await upsertFn({
+        id: "T09",
+        trator_id: "T09",
+        nome: "TR INATIVO",
+        frota: "700001",
+        tipo_equipamento: "TRATOR",
+        status: "INATIVO",
+        empresa_id: "SILOOPS",
+        usina_id: "USINA_PADRAO",
+        unidade_id: "UNIDADE_PADRAO",
+      });
+
       const store = await readFn();
       const master = store.items.find((item) => item.trator_id === "T01");
       assert.equal(master?.frota, "602040");
       assert.equal(master?.nome, "TR PREPARO");
+      assert.equal(normalizeFrotaFn(" 602040 "), "602040");
+      assert.equal(findByFrotaFn(store.items, " 602040 ", { role: "ADMIN_GLOBAL", empresa_id: "SILOOPS", usinas: ["*"], unidades: ["*"] })?.trator_id, "T01");
+      assert.equal(findByFrotaFn(store.items, "999999", { role: "ADMIN_GLOBAL", empresa_id: "SILOOPS", usinas: ["*"], unidades: ["*"] }), null);
+      assert.deepEqual(
+        listActiveFn(store.items, { role: "ADMIN_GLOBAL", empresa_id: "SILOOPS", usinas: ["*"], unidades: ["*"] }).map((item) => item.trator_id).sort(),
+        ["T01", "T02"],
+      );
 
       const statusRow = mergeFn(
         {
@@ -302,6 +356,23 @@ if (existsSync(storeFsPath)) {
       const details = await detailsMod.buildEquipmentDetails("T01", { role: "ADMIN_GLOBAL", empresa_id: "SILOOPS", usinas: ["*"], unidades: ["*"] });
       assert.equal(details?.frota, "602040");
       assert.equal(details?.nome_equipamento, "TR PREPARO");
+
+      const fleetRoute = await loadMobileRouteModule("fleet", jsonPath, { role: "ADMIN_GLOBAL", empresa_id: "SILOOPS", usinas: ["*"], unidades: ["*"] });
+      const listRoute = await loadMobileRouteModule("list", jsonPath, { role: "ADMIN_GLOBAL", empresa_id: "SILOOPS", usinas: ["*"], unidades: ["*"] });
+
+      const okResponse = await fleetRoute.GET({}, { params: Promise.resolve({ frota: " 602040 " }) });
+      assert.equal(okResponse.status, 200);
+      assert.equal((await okResponse.json()).trator_id, "T01");
+
+      const missingResponse = await fleetRoute.GET({}, { params: Promise.resolve({ frota: "999999" }) });
+      assert.equal(missingResponse.status, 404);
+
+      const inactiveResponse = await fleetRoute.GET({}, { params: Promise.resolve({ frota: "700001" }) });
+      assert.equal(inactiveResponse.status, 409);
+
+      const listResponse = await listRoute.GET({});
+      assert.equal(listResponse.status, 200);
+      assert.deepEqual((await listResponse.json()).map((item) => item.trator_id).sort(), ["T01", "T02"]);
     } finally {
       globalThis.fetch = originalFetch;
       rmSync(dir, { recursive: true, force: true });

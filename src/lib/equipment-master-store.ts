@@ -144,6 +144,12 @@ function toText(value: unknown, fallback = "") {
   return typeof value === "string" && value.trim() ? value.trim() : fallback;
 }
 
+export function normalizeFrotaCode(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) return String(value).trim().toUpperCase();
+  if (typeof value === "string") return value.trim().toUpperCase();
+  return "";
+}
+
 function toLooseText(value: unknown, fallback = "") {
   if (typeof value === "string" && value.trim()) return value.trim();
   if (typeof value === "number" && Number.isFinite(value)) return String(value);
@@ -323,6 +329,17 @@ export function findEquipmentMasterRecord(items: EquipmentMasterRecord[], lookup
   };
   const scoped = listAccessibleEquipmentMaster(items, session || null);
   return scoped.find((item) => compositeKey(item) === compositeKey(target)) || scoped.find((item) => item.trator_id === target.trator_id) || null;
+}
+
+export function findEquipmentMasterRecordByFrota(items: EquipmentMasterRecord[], frota: string, session?: SessionPayload | null) {
+  const targetFrota = normalizeFrotaCode(frota);
+  if (!targetFrota) return null;
+  const scoped = listAccessibleEquipmentMaster(items, session || null);
+  return scoped.find((item) => normalizeFrotaCode(item.frota) === targetFrota) || null;
+}
+
+export function listActiveEquipmentMaster(items: EquipmentMasterRecord[], session?: SessionPayload | null) {
+  return listAccessibleEquipmentMaster(items, session || null).filter((item) => item.status === "ATIVO");
 }
 
 export function enrichEquipmentStatusWithMaster<T extends Record<string, unknown>>(statusItem: T, master: EquipmentMasterRecord | null) {
