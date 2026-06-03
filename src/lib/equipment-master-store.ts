@@ -339,6 +339,7 @@ export function enrichEquipmentStatusWithMaster<T extends Record<string, unknown
     trator_id: master.trator_id,
     nome: master.nome,
     tipo_equipamento: master.tipo_equipamento,
+    frota: master.frota,
     modelo: master.modelo,
     grupo: master.grupo,
     perfil: master.perfil,

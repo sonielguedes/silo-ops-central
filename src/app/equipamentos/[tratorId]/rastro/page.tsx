@@ -133,10 +133,11 @@ export default function EquipamentoRastroPage() {
   const type = details ? getEquipmentType(details as unknown as Record<string, unknown>) : "OUTRO";
   const icon = details ? getIconForModel(type, {}) : null;
   const visual = details ? resolveEquipmentVisualState(details as unknown as Record<string, unknown>) : null;
+  const operationalId = details?.frota || tratorId;
 
   return (
     <div className="flex-1 flex flex-col min-h-screen">
-      <Header title={`Rastro do Equipamento ${tratorId || "--"}`} sub="Trajeto histórico com filtro temporal, pontos GPS e métricas operacionais" />
+      <Header title={`Rastro do Equipamento ${operationalId || "--"}`} sub="Trajeto histórico com filtro temporal, pontos GPS e métricas operacionais" />
       <main className="p-6 space-y-6">
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-3">
@@ -154,9 +155,9 @@ export default function EquipamentoRastroPage() {
               </div>
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#4a6a8a]">Identidade operacional</p>
-                <h3 className="text-white font-black text-xl">{details.nome_equipamento || tratorId}</h3>
+                <h3 className="text-white font-black text-xl">{details.frota ? `${details.frota} — ${details.nome_equipamento || tratorId}` : (details.nome_equipamento || tratorId)}</h3>
                 <div className="mt-1 flex items-center gap-2 flex-wrap">
-                  <span className="text-[11px] font-mono font-black uppercase tracking-widest text-[#8fdfff]">{tratorId}</span>
+                  <span className="text-[11px] font-mono font-black uppercase tracking-widest text-[#4a6a8a]">ID Tecnico: {tratorId}</span>
                   <Badge label={getEquipmentTypeDisplay(type)} variant="info" dot={false} />
                   <Badge label={visual?.label || details.status || details.presence || "Sem status"} variant={visual?.key === "OFFLINE" ? "offline" : visual?.key === "INSTAVEL" ? "instavel" : visual?.key === "ALERTA" ? "erro" : visual?.key === "PARADO_APONTAMENTO" ? "pendente" : visual?.key === "DESLOCAMENTO" ? "enviado" : "online"} />
                 </div>

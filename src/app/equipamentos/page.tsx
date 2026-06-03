@@ -102,6 +102,7 @@ function normalizeMasterRecord(item: AdminEquipmentPayload): EquipmentMasterReco
     empresa_id: normalizeText(item.empresa_id) || null,
     usina_id: normalizeText(item.usina_id) || null,
     unidade_id: normalizeText(item.unidade_id) || null,
+    frota: normalizeText(item.frota),
     observacao: normalizeText(item.observacao || item.notes || item.descricao) || null,
   };
 }
@@ -158,9 +159,11 @@ function mergeEquipments(masterList: EquipmentMasterRecord[], liveList: Equipame
 
     return {
       id,
+      trator_id: id,
       master,
       live,
       displayName,
+      frota: master?.frota || live?.frota || null,
       type,
       typeLabel: getEquipmentTypeLabel(type),
       statusLabel: master?.status || (master ? "Sem status" : "Nao cadastrado"),
@@ -185,6 +188,7 @@ function filterBySearch(row: EquipmentRegistryRow, search: string) {
   if (!search) return true;
   const text = [
     row.id,
+    row.frota || "",
     row.displayName,
     row.typeLabel,
     row.statusLabel,
@@ -315,8 +319,9 @@ export default function EquipamentosPage() {
     setModalError(null);
     try {
       const payload = {
-        id,
-        trator_id: id,
+        id: values.trator_id.trim(),
+        trator_id: values.trator_id.trim(),
+        frota: values.frota.trim() || null,
         nome: values.nome.trim() || null,
         tipo_equipamento: values.tipo_equipamento.trim() || null,
         modelo: values.modelo.trim() || null,
@@ -451,8 +456,8 @@ export default function EquipamentosPage() {
                   {filtered.map((row) => (
                     <tr key={row.id} className="align-top hover:bg-[#1e2d3d]/30">
                       <td className="px-4 py-4">
-                        <div className="font-semibold text-[#dce8f5]">{row.displayName}</div>
-                        <div className="mt-1 font-mono text-[10px] uppercase tracking-widest text-[#8fdfff]">{row.id}</div>
+                        <div className="font-semibold text-[#dce8f5]">{row.frota ? `${row.frota} — ${row.displayName}` : row.displayName}</div>
+                        <div className="mt-1 font-mono text-[10px] uppercase tracking-widest text-[#4a6a8a]">ID Tecnico: {row.id}</div>
                         <div className="mt-1 text-[11px] text-[#4a6a8a]">{row.model || "Sem modelo"}{row.group ? ` - ${row.group}` : ""}</div>
                       </td>
                       <td className="px-4 py-4">

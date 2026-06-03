@@ -19,6 +19,7 @@ export interface Equipamento {
   modelo?: string | null;
   descricao?: string | null;
   tipo_equipamento?: string | null;
+  frota?: string | null;
   cadastro_status?: "CADASTRADO" | "SEM_TELEMETRIA" | "NAO_CADASTRADO" | "DESCONHECIDO" | null;
   tem_telemetria?: boolean | null;
   master?: boolean | null;
@@ -83,6 +84,7 @@ export interface EquipmentDetails {
   trator_id: string;
   nome_equipamento: string | null;
   tipo_equipamento: string;
+  frota?: string | null;
   cadastro_status?: "CADASTRADO" | "SEM_TELEMETRIA" | "NAO_CADASTRADO" | "DESCONHECIDO" | null;
   presence: string | null;
   status: string | null;
@@ -280,6 +282,7 @@ export function normalizeEquipment(item: Record<string, unknown>): Equipamento {
     modelo: hasText(item.modelo) ? String(item.modelo) : null,
     descricao: hasText(item.descricao) ? String(item.descricao) : null,
     tipo_equipamento: hasText(item.tipo_equipamento) ? String(item.tipo_equipamento) : null,
+    frota: hasText(item.frota) ? String(item.frota) : null,
     cadastro_status: cadastroStatus,
     tem_telemetria: typeof item.tem_telemetria === "boolean" ? item.tem_telemetria : (cadastroStatus ? cadastroStatus === "CADASTRADO" : null),
     master: typeof item.master === "boolean" ? item.master : (cadastroStatus ? cadastroStatus !== "NAO_CADASTRADO" : null),

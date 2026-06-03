@@ -125,7 +125,7 @@ export default function MapComponent({
         })()
       : null;
 
-    const label = `${eq.trator_id} · ${statusTone.short}`;
+    const label = `${eq.frota || eq.trator_id} · ${statusTone.short}`;
 
     return L.divIcon({
       className: "sil-marker-node",

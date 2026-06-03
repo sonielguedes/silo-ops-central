@@ -16,6 +16,7 @@ export type EquipmentMasterRecord = {
   grupo?: string | null;
   perfil?: string | null;
   status?: string | null;
+  frota?: string | null;
   updated_at?: string | null;
   created_at?: string | null;
   empresa_id?: string | null;
@@ -26,9 +27,11 @@ export type EquipmentMasterRecord = {
 
 export type EquipmentRegistryRow = {
   id: string;
+  trator_id: string;
   master: EquipmentMasterRecord | null;
   live: Equipamento | null;
   displayName: string;
+  frota: string | null;
   type: EquipmentType;
   typeLabel: string;
   statusLabel: string;
@@ -49,6 +52,7 @@ export type EquipmentRegistryRow = {
 
 export type EquipmentFormValues = {
   trator_id: string;
+  frota: string;
   nome: string;
   tipo_equipamento: string;
   modelo: string;
@@ -136,6 +140,7 @@ export default function EquipmentRegistryModal({
 }: Props) {
   const [form, setForm] = useState<EquipmentFormValues>({
     trator_id: "",
+    frota: "",
     nome: "",
     tipo_equipamento: "",
     modelo: "",
@@ -147,10 +152,11 @@ export default function EquipmentRegistryModal({
   useEffect(() => {
     if (!open) return;
     setForm({
-      trator_id: row?.id || "",
-      nome: row?.master?.nome || row?.displayName || "",
-      tipo_equipamento: row?.master?.tipo_equipamento || row?.typeLabel || "",
-      modelo: row?.master?.modelo || "",
+      trator_id: row?.master?.trator_id || row?.live?.trator_id || row?.id || "",
+      frota: row?.master?.frota || row?.live?.frota || "",
+      nome: row?.master?.nome || row?.live?.nome || row?.displayName || "",
+      tipo_equipamento: row?.master?.tipo_equipamento || row?.live?.tipo_equipamento || row?.typeLabel || "",
+      modelo: row?.master?.modelo || row?.live?.modelo || "",
       grupo: row?.master?.grupo || "",
       perfil: row?.master?.perfil || "",
       status: row?.master?.status || row?.statusLabel || "",
@@ -200,7 +206,7 @@ export default function EquipmentRegistryModal({
             <h2 className="mt-1 text-2xl font-black text-white">{title}</h2>
             {row && (
               <div className="mt-2 flex flex-wrap items-center gap-2">
-                <span className="font-mono text-[11px] font-black uppercase tracking-widest text-[#8fdfff]">{row.id}</span>
+                <span className="font-mono text-[11px] font-black uppercase tracking-widest text-[#8fdfff]">{row.frota || row.trator_id}</span>
                 <Badge label={row.isRegistered ? "Cadastrado" : "Nao cadastrado"} variant={row.isRegistered ? "online" : "pendente"} />
                 <Badge label={telemetryLabel(row)} variant={row.hasTelemetry ? row.telemetryTone : "info"} />
               </div>
@@ -227,7 +233,8 @@ export default function EquipmentRegistryModal({
           {mode === "details" ? (
             <div className="grid gap-4 lg:grid-cols-3">
               <Section title="Cadastro">
-                <DetailRow label="Identificador" value={row?.id || "--"} />
+                <DetailRow label="Frota" value={row?.frota || "--"} />
+                <DetailRow label="ID Tecnico" value={row?.trator_id || "--"} />
                 <DetailRow label="Nome" value={empty(row?.master?.nome || row?.displayName)} />
                 <DetailRow label="Tipo" value={row?.typeLabel || "--"} />
                 <DetailRow label="Modelo" value={empty(row?.model)} />
@@ -256,10 +263,13 @@ export default function EquipmentRegistryModal({
             </div>
           ) : (
             <div className="grid gap-4 lg:grid-cols-2">
-              <Section title="Cadastro tecnico">
+              <Section title="Cadastro operacional">
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <Field label="Identificador" value={form.trator_id} onChange={(value) => setForm((prev) => ({ ...prev, trator_id: value }))} disabled={lockId} />
-                  <Field label="Nome" value={form.nome} onChange={(value) => setForm((prev) => ({ ...prev, nome: value }))} />
+                  <Field label="Frota / Cod. Operacional" value={form.frota} onChange={(value) => setForm((prev) => ({ ...prev, frota: value }))} />
+                  <Field label="ID Tecnico (Ex: T01)" value={form.trator_id} onChange={(value) => setForm((prev) => ({ ...prev, trator_id: value }))} disabled={lockId} />
+                  <div className="sm:col-span-2">
+                    <Field label="Nome / Apelido" value={form.nome} onChange={(value) => setForm((prev) => ({ ...prev, nome: value }))} />
+                  </div>
                   <Field label="Tipo" value={form.tipo_equipamento} options={classificationOptions?.tipos} onChange={(value) => setForm((prev) => ({ ...prev, tipo_equipamento: value }))} />
                   <Field label="Modelo" value={form.modelo} options={classificationOptions?.modelos} onChange={(value) => setForm((prev) => ({ ...prev, modelo: value }))} />
                   <Field label="Grupo" value={form.grupo} options={classificationOptions?.grupos} onChange={(value) => setForm((prev) => ({ ...prev, grupo: value }))} />
@@ -271,7 +281,8 @@ export default function EquipmentRegistryModal({
               </Section>
 
               <Section title="Pre-visualizacao">
-                <DetailRow label="Identificador" value={form.trator_id || "--"} />
+                <DetailRow label="Frota" value={form.frota || "--"} />
+                <DetailRow label="ID Tecnico" value={form.trator_id || "--"} />
                 <DetailRow label="Nome" value={form.nome || "--"} />
                 <DetailRow label="Tipo" value={empty(form.tipo_equipamento)} />
                 <DetailRow label="Modelo" value={empty(form.modelo)} />

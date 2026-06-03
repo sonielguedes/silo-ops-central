@@ -122,9 +122,9 @@ export default function EquipmentDetailsDrawer({ tratorId, open, onClose }: Prop
             </div>
             <div>
               <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#4a6a8a]">Painel de equipamento</p>
-              <h2 className="text-xl font-black text-white leading-tight">{data?.nome_equipamento || tratorId}</h2>
+              <h2 className="text-xl font-black text-white leading-tight">{data?.frota ? `${data.frota} — ${data.nome_equipamento || tratorId}` : (data?.nome_equipamento || tratorId)}</h2>
               <div className="mt-1 flex flex-wrap items-center gap-2">
-                <span className="text-[11px] font-mono font-black uppercase tracking-widest text-[#8fdfff]">{tratorId}</span>
+                <span className="text-[11px] font-mono font-black uppercase tracking-widest text-[#4a6a8a]">ID Tecnico: {tratorId}</span>
                 <Badge label={equipmentType ? getEquipmentTypeDisplay(equipmentType) : "--"} variant="info" dot={false} />
                 <Badge label={visual.label} variant={badgeVariantFromVisual(visual.key)} />
                 <Badge
