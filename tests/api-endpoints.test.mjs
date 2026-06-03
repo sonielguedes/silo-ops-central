@@ -57,6 +57,7 @@ test("equipment trail page and proxy route exist with cookie guard and tenant-sa
 test("equipment trail page handles empty API payload without indexing points", () => {
   const pageSource = readFileSync(new URL("../src/app/equipamentos/[tratorId]/rastro/page.tsx", import.meta.url), "utf8");
   const trailMapSource = readFileSync(new URL("../src/components/TrailMap.tsx", import.meta.url), "utf8");
+  const trailHelperSource = readFileSync(new URL("../src/lib/trail-map.ts", import.meta.url), "utf8");
 
   assert.match(pageSource, /Nenhum ponto de rastro encontrado para este equipamento no período\./);
   assert.match(pageSource, /stats\.km === null/);
@@ -66,7 +67,13 @@ test("equipment trail page handles empty API payload without indexing points", (
   assert.match(pageSource, /dynamic\(\(\) => import\("@\/components\/TrailMap"\), \{\s*ssr:\s*false,\s*loading:/s);
   assert.match(trailMapSource, /points\.length === 0/);
   assert.match(trailMapSource, /emptyMessage/);
-  assert.match(trailMapSource, /Posi.*atual/);
+  assert.match(trailMapSource, /buildTrailVisualization/);
+  assert.match(trailMapSource, /trail-tooltip/);
+  assert.match(trailMapSource, /Salto GPS detectado/);
+  assert.match(trailMapSource, /dashArray/);
+  assert.match(trailHelperSource, /buildPointTooltip/);
+  assert.match(trailHelperSource, /buildJumpTooltip/);
+  assert.match(trailHelperSource, /isGpsJump/);
   assert.match(pageSource, /Estado operacional/);
   assert.match(pageSource, /Código de parada/);
   assert.match(pageSource, /Descrição da parada/);
@@ -79,7 +86,7 @@ test("trail map defaults to satellite and offers map fallback toggle", () => {
   const trailPageSource = readFileSync(new URL("../src/app/equipamentos/[tratorId]/rastro/page.tsx", import.meta.url), "utf8");
 
   assert.match(trailMapSource, /World_Imagery/);
-  assert.match(trailMapSource, /Satélite/);
+  assert.match(trailMapSource, /Sat.*lite/);
   assert.match(trailMapSource, /Mapa/);
   assert.match(trailMapSource, /satellite/i);
   assert.match(trailPageSource, /TrailMap/);
