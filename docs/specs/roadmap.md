@@ -3,6 +3,10 @@
 ## Objetivo
 Registrar a trilha da Fase 3.x com o que ja foi concluido e o que ainda falta.
 
+## Fonte mestre
+- [SPEC_DRIVEN_DEVELOPMENT.md](./SPEC_DRIVEN_DEVELOPMENT.md)
+- Este roadmap eh um resumo operacional. O documento mestre define a visao consolidada do projeto.
+
 ## Concluido
 - 3.4A SSR mapa
 - 3.4B fontes reais

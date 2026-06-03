@@ -626,6 +626,10 @@ test("drawer shows separated blocks for presence, operational state and last ope
 
 test("roadmap includes 3.4M as completed", () => {
   const roadmapSource = readFileSync(new URL("../docs/specs/roadmap.md", import.meta.url), "utf8");
+  const specSource = readFileSync(new URL("../docs/specs/SPEC_DRIVEN_DEVELOPMENT.md", import.meta.url), "utf8");
 
   assert.match(roadmapSource, /3\.4M normalizar presen/);
+  assert.match(roadmapSource, /SPEC_DRIVEN_DEVELOPMENT\.md/);
+  assert.match(specSource, /SILO OPS Central/);
+  assert.match(specSource, /Collector/);
 });
