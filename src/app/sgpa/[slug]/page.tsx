@@ -145,7 +145,7 @@ export default function SgpaModulePage({ params }: { params: Promise<{ slug: str
                   {st?.online ? (
                     <span className="text-[#00e676] font-semibold flex items-center gap-1.5">
                       <span className="w-1.5 h-1.5 rounded-full bg-[#00e676] animate-pulse" />
-                      API Online
+                      API Ativa
                     </span>
                   ) : (
                     <span className="text-[#ffab00]">aguardando API</span>

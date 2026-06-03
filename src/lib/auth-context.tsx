@@ -22,6 +22,7 @@ interface LoginResult {
 
 interface AuthContextType {
   session: SessionPayload | null;
+  profile: ReturnType<typeof buildVisualProfile> | null;
   isAuthenticated: boolean;
   login: (email: string, pass: string, returnTo?: string) => Promise<LoginResult>;
   logout: () => Promise<void>;
@@ -47,6 +48,7 @@ export function AuthProvider({
 }) {
   const [session, setSession] = useState<SessionPayload | null>(initialSession);
   const router = useRouter();
+  const profile = session ? buildVisualProfile(session.email, session.mode) : null;
 
   useEffect(() => {
     mirrorSession(session);
@@ -102,6 +104,7 @@ export function AuthProvider({
   const value: AuthContextType = {
     session,
     isAuthenticated: Boolean(session && session.expiry > Date.now()),
+    profile,
     login,
     logout,
   };

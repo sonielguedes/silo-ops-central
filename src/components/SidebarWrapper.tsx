@@ -15,7 +15,7 @@ export default function SidebarWrapper({ children }: { children: React.ReactNode
     <>
       <DemoBanner />
       <Sidebar />
-      <div className="ml-72 min-h-screen flex flex-col relative z-10 bg-[#07111f]">
+      <div className="min-h-screen flex flex-col relative z-10 bg-[#07111f] md:ml-72">
         <div
           className="pointer-events-none fixed inset-0 z-0 opacity-[0.02]"
           style={{

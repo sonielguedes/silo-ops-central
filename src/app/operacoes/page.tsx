@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Header from "@/components/Header";
 import StatCard from "@/components/StatCard";
@@ -44,6 +44,14 @@ function useDebouncedValue<T>(value: T, delay = 250): T {
     return () => clearTimeout(id);
   }, [value, delay]);
   return debounced;
+}
+
+function opKey(op: OperacaoAtiva, index: number) {
+  return op.operacao_id || `${op.trator_id || "sem-trator"}-${op.inicio || "sem-inicio"}-${index}`;
+}
+
+function eventKey(ev: EventoLinha, index: number) {
+  return `${ev.operacao_id || "sem-operacao"}-${ev.trator_id || "sem-trator"}-${ev.horario || "sem-horario"}-${ev.tipo_evento || "sem-tipo"}-${index}`;
 }
 
 export default function OperacoesPage() {
@@ -135,10 +143,10 @@ export default function OperacoesPage() {
                 <th className="px-4 py-3">Equipamento</th><th className="px-4 py-3">Operador</th><th className="px-4 py-3">Operação</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Frente/Talhão</th><th className="px-4 py-3">Início</th><th className="px-4 py-3">Duração</th><th className="px-4 py-3">Último evento</th><th className="px-4 py-3">Origem</th><th className="px-4 py-3 text-right">Ação</th>
               </tr></thead>
               <tbody className="divide-y divide-[#1e2d3d]/50 bg-[#161f2a]">
-                {view.map(op => {
+                {view.map((op, index) => {
                   const st = opStatus(op);
                   const latest = events.find(ev => ev.trator_id === op.trator_id || ev.operacao_id === op.operacao_id);
-                  return <tr key={op.operacao_id} className="hover:bg-[#1e2d3d]/30 align-top">
+                  return <tr key={opKey(op, index)} className="hover:bg-[#1e2d3d]/30 align-top">
                     <td className="px-4 py-4"><div className="font-semibold text-[#c8d8e8]">{op.trator_id}</div><div className="text-[#4a6a8a] text-[10px]">heartbeat {op.last_seen ? timeAgo(op.last_seen) : "Aguardando heartbeat"}</div></td>
                     <td className="px-4 py-4 text-[#c8d8e8]">{readable(op.nome_operador, "Operador não identificado")}</td>
                     <td className="px-4 py-4 text-[#c8d8e8]">{readable(op.operacao_atual || op.status, "Sem dado recebido")}</td>
@@ -167,7 +175,29 @@ export default function OperacoesPage() {
               <StatusRow label="Operação atual" value={readable(selected.operacao_atual || selected.status, "Sem dado recebido")} />
               <StatusRow label="Status sincronização" value={selected.last_seen ? `Heartbeat ${timeAgo(selected.last_seen)}` : "Aguardando heartbeat"} />
               <StatusRow label="Origem dos dados" value={selected.last_seen ? "API/MQTT" : "Sem informação disponível"} />
-              <div className="card-p"><p className="text-[#c8d8e8] font-black text-sm mb-3">Linha do tempo resumida</p><div className="space-y-2">{timeline.length === 0 ? <EmptyState title="Sem eventos recentes" sub="Não há eventos para esta operação." /> : timeline.map(ev => <div key={`${ev.equipamento}-${ev.horario}`} className="rounded-xl border border-[#1f334d] bg-[#101b2d] p-3"><div className="flex justify-between gap-3"><p className="text-[#c8d8e8] font-semibold text-sm">{ev.tipo_evento}</p><Badge label={ev.origem} variant={ev.origem === "MQTT" ? "online" : ev.origem === "API" ? "enviado" : ev.origem === "OfflineSync" ? "pendente" : "info"} dot={false} /></div><p className="text-[#4a6a8a] text-xs mt-1">{ev.status}</p><p className="text-[#4a6a8a] text-[10px] font-mono mt-1">{fmtDate(ev.horario)}</p></div>)}</div></div>
+              <div className="card-p">
+                <p className="text-[#c8d8e8] font-black text-sm mb-3">Linha do tempo resumida</p>
+                <div className="space-y-2">
+                  {timeline.length === 0 ? (
+                    <EmptyState title="Sem eventos recentes" sub="Não há eventos para esta operação." />
+                  ) : (
+                    timeline.map((ev, index) => (
+                      <div key={eventKey(ev, index)} className="rounded-xl border border-[#1f334d] bg-[#101b2d] p-3">
+                        <div className="flex justify-between gap-3">
+                          <p className="text-[#c8d8e8] font-semibold text-sm">{ev.tipo_evento}</p>
+                          <Badge
+                            label={ev.origem}
+                            variant={ev.origem === "MQTT" ? "online" : ev.origem === "API" ? "enviado" : ev.origem === "OfflineSync" ? "pendente" : "info"}
+                            dot={false}
+                          />
+                        </div>
+                        <p className="text-[#4a6a8a] text-xs mt-1">{ev.status}</p>
+                        <p className="text-[#4a6a8a] text-[10px] font-mono mt-1">{fmtDate(ev.horario)}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
             </aside>
           </div>
         )}
@@ -176,3 +206,8 @@ export default function OperacoesPage() {
     </div>
   );
 }
+
+
+
+
+

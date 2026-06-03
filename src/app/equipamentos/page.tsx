@@ -93,7 +93,7 @@ export default function EquipamentosPage() {
                     >
                       <td className="px-4 py-3"><span className={`font-bold ${p === "ONLINE" ? "text-[#00e676]" : p === "INSTAVEL" ? "text-[#ffab00]" : "text-[#ff3d57]"}`}>{eq.trator_id}</span></td>
                       <td className="px-4 py-3"><Badge label={p} variant={p === "ONLINE" ? "online" : p === "INSTAVEL" ? "instavel" : "offline"} /></td>
-                      <td className="px-4 py-3 text-[#4a6a8a] text-xs">{eq.estado_operacional || eq.status || "--"}</td>
+                      <td className="px-4 py-3 text-[#4a6a8a] text-xs">{(eq as any).status_resumo || eq.estado_operacional || eq.status || "--"}</td>
                       <td className="px-4 py-3 text-[#4a6a8a] text-xs">{timeAgo(eq.last_seen)}</td>
                       <td className="px-4 py-3">
                         {eq.bateria !== null ? <div className="flex items-center gap-2"><div className="w-12 h-1.5 bg-[#1e2d3d] rounded-full overflow-hidden"><div style={{ width: `${Math.min(eq.bateria, 100)}%` }} className={`h-full rounded-full ${eq.bateria > 60 ? "bg-[#00e676]" : eq.bateria > 30 ? "bg-[#ffab00]" : "bg-[#ff3d57]"}`} /></div><span className="text-xs text-[#4a6a8a]">{eq.bateria}%</span></div> : <span className="text-[#4a6a8a]">--</span>}

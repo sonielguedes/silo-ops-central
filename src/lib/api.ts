@@ -1,4 +1,4 @@
-﻿import type { EventoOperacional } from "@/lib/dashboard-types";
+import type { EventoOperacional } from "@/lib/dashboard-types";
 
 const API = (process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000").trim().replace(/\/$/, "");
 const SHOULD_LOG_API_WARNINGS = process.env.NODE_ENV !== "production";
@@ -101,6 +101,12 @@ export interface EquipmentDetails {
   updated_at: string | null;
   evento_status: string | null;
   motivo_status: string | null;
+  /** Operação ativa atual — somente se jornada/operação válida e equipamento online/instável */
+  operacao_atual: string | null;
+  /** Última operação/evento conhecido, mesmo se equipamento offline */
+  ultima_operacao_conhecida: string | null;
+  /** Texto curto para UI: "Online trabalhando", "Offline — última operação: X" */
+  status_resumo: string | null;
 }
 
 export type ApiResult<T> = { ok: true; data: T } | { ok: false; error: string };

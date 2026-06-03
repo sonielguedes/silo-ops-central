@@ -121,8 +121,15 @@ export function resolveEquipmentVisualState(item: Record<string, unknown> & { la
   if (hasAlert) return { key: "ALERTA", color: "#a855f7", label: "Alerta operacional", short: "ALERTA" };
   if (/OFF|DESLIG|SEM SINAL|SEM_SINAL/.test(status)) return { key: "OFFLINE", color: "#ef4444", label: "Offline", short: "OFF" };
   if (/INST/.test(status) || /INST/.test(operational)) return { key: "INSTAVEL", color: "#f59e0b", label: "Instável", short: "INST" };
-  if (hasStop && /PARAD/.test(operational)) return { key: "PARADO_APONTAMENTO", color: "#ff9800", label: "Parado com apontamento", short: "PAR" };
-  if (velocity > 1 || /DESLOC|MOV/.test(status) || /MOV/.test(operational)) return { key: "DESLOCAMENTO", color: "#2196f3", label: "Deslocamento", short: "MOV" };
+
+  // Handle normalized estado_operacional values
+  if (operational === "PARADO" || (hasStop && /PARAD/.test(operational))) return { key: "PARADO_APONTAMENTO", color: "#ff9800", label: "Parado com apontamento", short: "PAR" };
+  if (operational === "PAUSADO") return { key: "PARADO_APONTAMENTO", color: "#ff9800", label: "Pausado", short: "PAU" };
+  if (operational === "EM_MOVIMENTO" || velocity > 1 || /DESLOC|MOV/.test(status) || /MOV/.test(operational)) return { key: "DESLOCAMENTO", color: "#2196f3", label: "Deslocamento", short: "MOV" };
+  if (operational === "TRABALHANDO") return { key: "ONLINE", color: "#22c55e", label: "Trabalhando", short: "ON" };
+  if (operational === "SEM_OPERACAO") return { key: "ONLINE", color: "#22c55e", label: "Sem operação ativa", short: "ON" };
+  if (operational === "DESCONHECIDO") return { key: "ONLINE", color: "#4a6a8a", label: "Estado desconhecido", short: "--" };
+
   return { key: "ONLINE", color: "#22c55e", label: "Ativo", short: "ON" };
 }
 

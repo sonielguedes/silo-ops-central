@@ -2,6 +2,7 @@ import { IS_DEMO, SITE_URL } from "@/lib/app-env";
 import { normalizeEquipmentList } from "@/lib/api";
 import { filterItemsBySessionScope, normalizeScopeFields, type SessionPayload } from "@/lib/auth";
 import { enrichTrailPointWithOperationalContext, fetchEquipmentStatusSnapshot } from "@/lib/equipment-status-trail";
+import { normalizeEquipmentState } from "@/lib/equipment-state";
 import { queryEquipmentTrailPoints } from "@/lib/equipment-trail-store";
 import { normalizeEquipmentType, type EquipmentType } from "@/lib/equipment-type";
 
@@ -32,6 +33,9 @@ export type EquipmentDetails = {
   updated_at: string | null;
   evento_status: string | null;
   motivo_status: string | null;
+  operacao_atual: string | null;
+  ultima_operacao_conhecida: string | null;
+  status_resumo: string | null;
 };
 
 type NormalizedStatus = Record<string, unknown> & {
@@ -314,7 +318,7 @@ export async function buildEquipmentDetails(tratorId: string, session: SessionPa
     trator_id: base.trator_id,
   });
 
-  return {
+  const rawDetails = {
     trator_id: tratorId,
     nome_equipamento: text(base.nome ?? base.modelo ?? base.descricao ?? tratorId),
     tipo_equipamento: type,
@@ -339,5 +343,31 @@ export async function buildEquipmentDetails(tratorId: string, session: SessionPa
     updated_at: updatedAt,
     evento_status: event?.evento_status || trailItem?.evento_status || base.evento_status || null,
     motivo_status: event?.motivo_status || trailItem?.motivo_status || base.motivo_status || null,
+  };
+
+  // Aplicar normalizador central para separar presença técnica de estado operacional
+  const normalized = normalizeEquipmentState({
+    presence: rawDetails.presence,
+    updated_at: rawDetails.updated_at,
+    last_seen: updatedAt,
+    estado_operacional: rawDetails.estado_operacional,
+    operacao_nome: rawDetails.operacao_nome,
+    operacao_id: rawDetails.operacao_id,
+    velocidade: rawDetails.velocidade,
+    codigo_parada: rawDetails.codigo_parada,
+    descricao_parada: rawDetails.descricao_parada,
+    evento_status: rawDetails.evento_status,
+    status: rawDetails.status,
+  });
+
+  return {
+    ...rawDetails,
+    presence: normalized.presence,
+    estado_operacional: normalized.estado_operacional,
+    codigo_parada: normalized.codigo_parada,
+    descricao_parada: normalized.descricao_parada,
+    operacao_atual: normalized.operacao_atual,
+    ultima_operacao_conhecida: normalized.ultima_operacao_conhecida,
+    status_resumo: normalized.status_resumo,
   };
 }

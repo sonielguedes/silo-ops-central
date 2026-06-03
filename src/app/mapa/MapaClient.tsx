@@ -71,11 +71,12 @@ export default function MapaClient() {
   const equipamentoComCoordenadas = useMemo(() => equip.map((eq) => ({ eq, coord: resolveEquipmentCoordinates(eq as unknown as Record<string, unknown>) })), [equip]);
   const comGPS = equipamentoComCoordenadas.filter((item) => item.coord.hasCoordinates).map((item) => item.eq);
   const semGPS = equipamentoComCoordenadas.filter((item) => !item.coord.hasCoordinates);
-  const onlineCount = equip.filter((e) => getOperationalPresenceInfo(e.last_seen).label === "ONLINE").length;
-  const instavelCount = equip.filter((e) => getOperationalPresenceInfo(e.last_seen).label === "INSTAVEL").length;
-  const offlineCount = equip.filter((e) => getOperationalPresenceInfo(e.last_seen).label === "OFFLINE").length;
-  const filteredComGPS = comGPS.filter((e) => !fPresence || getOperationalPresenceInfo(e.last_seen).label === fPresence);
-  const filteredSemGPS = semGPS.filter((item) => !fPresence || getOperationalPresenceInfo(item.eq.last_seen).label === fPresence);
+  const resolvedPresence = (e: Equipamento) => (e.presence === "ONLINE" || e.presence === "INSTAVEL" || e.presence === "OFFLINE") ? e.presence : getOperationalPresenceInfo(e.last_seen).label;
+  const onlineCount = equip.filter((e) => resolvedPresence(e) === "ONLINE").length;
+  const instavelCount = equip.filter((e) => resolvedPresence(e) === "INSTAVEL").length;
+  const offlineCount = equip.filter((e) => resolvedPresence(e) === "OFFLINE").length;
+  const filteredComGPS = comGPS.filter((e) => !fPresence || resolvedPresence(e) === fPresence);
+  const filteredSemGPS = semGPS.filter((item) => !fPresence || resolvedPresence(item.eq) === fPresence);
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
@@ -126,8 +127,8 @@ export default function MapaClient() {
                   className="w-full flex items-center justify-between gap-2 text-xs rounded-lg px-2 py-2 hover:bg-[#1e2d3d]/30 transition-colors text-left"
                 >
                   <span className="text-[#c8d8e8] font-semibold">{eq.trator_id}</span>
-                  <span className={`px-2 py-0.5 rounded border font-bold uppercase ${getOperationalPresenceInfo(eq.last_seen).label === "ONLINE" ? "text-[#00e676] border-[#00e676]/30" : getOperationalPresenceInfo(eq.last_seen).label === "INSTAVEL" ? "text-[#ffab00] border-[#ffab00]/30" : getOperationalPresenceInfo(eq.last_seen).label === "OFFLINE" ? "text-[#ff3d57] border-[#ff3d57]/30" : "text-[#6b7280] border-[#6b7280]/30"}`}>
-                    {getOperationalPresenceInfo(eq.last_seen).label}
+                  <span className={`px-2 py-0.5 rounded border font-bold uppercase ${resolvedPresence(eq) === "ONLINE" ? "text-[#00e676] border-[#00e676]/30" : resolvedPresence(eq) === "INSTAVEL" ? "text-[#ffab00] border-[#ffab00]/30" : resolvedPresence(eq) === "OFFLINE" ? "text-[#ff3d57] border-[#ff3d57]/30" : "text-[#6b7280] border-[#6b7280]/30"}`}>
+                    {resolvedPresence(eq)}
                   </span>
                 </button>
               )) : <div className="text-xs text-[#4a6a8a]">Nenhum equipamento com coordenadas filtrado.</div>}

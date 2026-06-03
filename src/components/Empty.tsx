@@ -1,4 +1,4 @@
-export default function Empty({ icon="📭", title="Nenhum registro", sub="" }: { icon?: string; title?: string; sub?: string }) {
+﻿export default function Empty({ icon="📭", title="Nenhum registro", sub="" }: { icon?: string; title?: string; sub?: string }) {
   return (
     <div className="flex flex-col items-center justify-center py-24 gap-4 animate-fade-in">
       <div className="w-20 h-20 rounded-3xl bg-[#101b2d] border border-[#1f334d] flex items-center justify-center text-4xl shadow-2xl relative overflow-hidden group">
@@ -12,3 +12,4 @@ export default function Empty({ icon="📭", title="Nenhum registro", sub="" }: 
     </div>
   );
 }
+

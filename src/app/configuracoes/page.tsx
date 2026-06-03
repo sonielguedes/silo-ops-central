@@ -55,7 +55,7 @@ export default function ConfiguracoesPage() {
               <p className="text-[#c8d8e8] font-semibold border-b border-[#1e2d3d] pb-3 text-sm">Conectividade & Comunicação</p>
               
               <div className="space-y-1.5">
-                <p className="text-[#4a6a8a] text-xs uppercase tracking-wider font-semibold">API Base URL</p>
+                <p className="text-[#4a6a8a] text-xs uppercase tracking-wider font-semibold">URL Base da API</p>
                 <input 
                   className="sil-input text-xs font-mono" 
                   value={apiUrl} 
@@ -77,7 +77,7 @@ export default function ConfiguracoesPage() {
                   onChange={e => setPolling(e.target.value)} 
                   required
                 />
-                <p className="text-[#4a6a8a] text-[10px]">Intervalo de tempo para atualização do dashboard e tratores (Padrão: 10s)</p>
+                <p className="text-[#4a6a8a] text-[10px]">Intervalo de tempo para atualização do painel e tratores (Padrão: 10s)</p>
               </div>
 
               <div className="pt-2 flex justify-end">
@@ -123,7 +123,7 @@ export default function ConfiguracoesPage() {
               </thead>
               <tbody className="divide-y divide-[#1e2d3d]/30 bg-[#161f2a]/20">
                 {[
-                  ["1. Dashboard Geral", "/health", "real"],
+                  ["1. Painel Geral", "/health", "real"],
                   ["2. Equipamentos / Tratores", "/api/equipamentos/status", "real"],
                   ["3. Operadores / Matrículas", "/api/operadores", "real"],
                   ["4. Operações (Ativas)", "/api/operacoes/ativas", "real"],
@@ -161,3 +161,8 @@ export default function ConfiguracoesPage() {
     </>
   );
 }
+
+
+
+
+

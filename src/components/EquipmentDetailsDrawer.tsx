@@ -154,29 +154,43 @@ export default function EquipmentDetailsDrawer({ tratorId, open, onClose }: Prop
             </div>
           ) : data ? (
             <div className="space-y-4">
-              <div className="rounded-3xl border border-[#1f334d] bg-[#0d1420] p-4">
-                <div className="grid grid-cols-2 gap-3">
-                  {row("Presença", emptyValue(data.presence))}
-                  {row("Status", emptyValue(data.status))}
-                  {row("Estado operacional", emptyValue(data.estado_operacional))}
-                  {row("Operador", emptyValue(data.operador))}
-                  {row("Operação", emptyValue(data.operacao_nome))}
-                  {row("Descrição da operação", emptyValue(data.descricao_operacao))}
+              {/* Status resumo badge */}
+              {data.status_resumo && (
+                <div className="rounded-2xl border border-[#1f334d] bg-[#101b2d]/80 px-4 py-3">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#4a6a8a] mb-1">Resumo</p>
+                  <p className="text-sm font-bold text-[#dce8f5]">{data.status_resumo}</p>
                 </div>
-              </div>
+              )}
 
-              <Section title="Parada" tone={visual.color}>
-                {row("Código", emptyValue(data.codigo_parada))}
-                {row("Descrição", emptyValue(data.descricao_parada))}
+              {/* Bloco 1: Presença técnica */}
+              <Section title="Presença técnica" tone={visual.color}>
+                {row("Presença", emptyValue(data.presence))}
+                {row("Comunicação", emptyValue(data.comunicacao))}
+                {row("Atualizado", data.updated_at ? new Date(data.updated_at).toLocaleString("pt-BR") : "--")}
+              </Section>
+
+              {/* Bloco 2: Estado operacional */}
+              <Section title="Estado operacional" tone={visual.color}>
+                {row("Estado", emptyValue(data.estado_operacional))}
+                {row("Operação atual", emptyValue(data.operacao_atual))}
+                {row("Operador", emptyValue(data.operador))}
+                {row("Descrição da operação", emptyValue(data.descricao_operacao))}
+                {row("Código de parada", emptyValue(data.codigo_parada))}
+                {row("Descrição da parada", emptyValue(data.descricao_parada))}
                 {row("Evento", emptyValue(data.evento_status))}
                 {row("Motivo", emptyValue(data.motivo_status))}
+              </Section>
+
+              {/* Bloco 3: Última operação conhecida */}
+              <Section title="Última operação conhecida" tone={visual.color}>
+                {row("Operação", emptyValue(data.ultima_operacao_conhecida))}
+                {row("Nome da operação", emptyValue(data.operacao_nome))}
+                {row("ID da operação", emptyValue(data.operacao_id))}
               </Section>
 
               <Section title="Telemetria" tone={visual.color}>
                 {row("Velocidade", data.velocidade === null ? "--" : `${fmt(data.velocidade, 1)} km/h`)}
                 {row("Bateria", data.bateria === null ? "--" : `${fmt(data.bateria, 0)}%`)}
-                {row("Comunicação", emptyValue(data.comunicacao))}
-                {row("Atualizado", data.updated_at ? new Date(data.updated_at).toLocaleString("pt-BR") : "--")}
               </Section>
 
               <Section title="Localização" tone={visual.color}>

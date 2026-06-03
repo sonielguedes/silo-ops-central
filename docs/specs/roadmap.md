@@ -11,6 +11,7 @@ Registrar a trilha da Fase 3.x com o que ja foi concluido e o que ainda falta.
 - 3.4E collector token
 - 3.4F estado operacional no rastro
 - 3.4G navegação do rastro dos equipamentos
+- 3.4M normalizar presença técnica vs estado operacional
 
 ## Proximas
 - 3.4H unificar estado operacional Dashboard/Equipamentos/Rastro

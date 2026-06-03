@@ -1,387 +1,740 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Header from "@/components/Header";
 import Badge from "@/components/Badge";
-import ApiErr from "@/components/ApiErr";
-import Empty from "@/components/Empty";
-import { fmtDate, fmtDur } from "@/lib/api";
+import SectionHeader from "@/components/dashboard/SectionHeader";
+import EmptyState from "@/components/dashboard/EmptyState";
+import TipoIntegracaoModal, { type TipoIntegracao } from "@/components/relatorios/TipoIntegracaoModal";
+import { IS_DEMO, IS_LOCAL } from "@/lib/app-env";
+import {
+  buildDemoFichas,
+  buildIntegracaoResumo,
+  canExportAll,
+  canIntegrateFicha,
+  fichaNeedsCorrection,
+  gerarCSV,
+  gerarTXT,
+  normalizeFichaList,
+  type FichaExportFormat,
+  type FichaIntegracaoResumo,
+  type FichaOperacional,
+  type FichaStatus,
+} from "@/lib/fichas-operacionais";
 
-interface FichaOperacional {
-  id_local: string;
-  operacao_id: string | null;
-  trator_id: string;
-  operador_id: string;
-  nome_operador: string | null;
-  fazenda: string | null;
-  talhao: string | null;
-  implemento: string | null;
-  status: string;
-  inicio: string | null;
-  fim: string | null;
-  area_total: number | null;
-  area_trabalhada: number | null;
-  horimetro_fisico_inicial: number;
-  horimetro_fisico_final: number | null;
-  horimetro_delta: number | null;
-  tempo_produtivo_segundos: number | null;
-  tempo_parado_segundos: number | null;
-  qtd_paradas: number | null;
-  payload_json: any;
-  criado_em: string;
-  atualizado_em: string;
+const STORAGE_KEY = "sil_fichas_operacionais_store_v1";
+
+type DrawerFicha = FichaOperacional;
+
+type EditableField =
+  | "regiao"
+  | "unidade"
+  | "grupoEquipamento"
+  | "equipamentoId"
+  | "operadorId"
+  | "tipoEquipamento"
+  | "fazenda"
+  | "zona"
+  | "talhao"
+  | "centroCusto"
+  | "origem";
+
+const EDITABLE_FIELDS: Array<[EditableField, string]> = [
+  ["regiao", "Região"],
+  ["unidade", "Unidade"],
+  ["grupoEquipamento", "Grupo"],
+  ["equipamentoId", "Equipamento"],
+  ["operadorId", "Operador ID"],
+  ["tipoEquipamento", "Tipo"],
+  ["fazenda", "Fazenda"],
+  ["zona", "Zona"],
+  ["talhao", "Talhão"],
+  ["centroCusto", "Centro de Custo"],
+  ["origem", "Origem"],
+];
+
+function getEditableValue(ficha: DrawerFicha, key: EditableField) {
+  return ficha[key] ?? "";
+}
+
+function readLocalFichas(): FichaOperacional[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const data = raw ? JSON.parse(raw) : [];
+    const list = normalizeFichaList(data);
+    return list.length > 0 ? list : buildDemoFichas();
+  } catch {
+    return buildDemoFichas();
+  }
+}
+
+function writeLocalFichas(fichas: FichaOperacional[]) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(fichas));
+}
+
+function downloadText(text: string, filename: string, mime: string) {
+  const blob = new Blob([text], { type: `${mime};charset=utf-8` });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function startOfDay(yyyyMmDd: string) {
+  return new Date(`${yyyyMmDd}T00:00:00`).getTime();
+}
+
+function endOfDay(yyyyMmDd: string) {
+  return new Date(`${yyyyMmDd}T23:59:59.999`).getTime();
+}
+
+function fmtShortDate(iso: string) {
+  return new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+}
+
+function statusMeta(status: FichaStatus) {
+  if (status === "EXPORTADO") return { label: "Exportada", variant: "enviado" as const };
+  if (status === "ATUALIZADO") return { label: "Atualizada", variant: "online" as const };
+  if (status === "INCONSISTENTE") return { label: "Inconsistente", variant: "erro" as const };
+  return { label: "Pendente", variant: "pendente" as const };
+}
+
+function isFichaIndeterminada(ficha: FichaOperacional) {
+  return ficha.status === "INCONSISTENTE" || !ficha.fazenda || !ficha.zona || !ficha.talhao || !ficha.centroCusto;
+}
+
+function getHorasIndeterminadas(ficha: FichaOperacional) {
+  return isFichaIndeterminada(ficha) ? ficha.horas : 0;
+}
+
+function getPercentualIndeterminado(ficha: FichaOperacional) {
+  if (ficha.horas <= 0) return 0;
+  return (getHorasIndeterminadas(ficha) / ficha.horas) * 100;
+}
+
+function applyLocalExportState(all: FichaOperacional[], selected: FichaOperacional[], exportedAt: string) {
+  const selectedIds = new Set(selected.map(item => item.id_local));
+  return all.map(item =>
+    selectedIds.has(item.id_local)
+      ? { ...item, status: "EXPORTADO" as FichaStatus, exportadoEm: exportedAt }
+      : item,
+  );
+}
+
+async function readJsonSafe(res: Response) {
+  const contentType = res.headers.get("content-type") || "";
+  if (!contentType.includes("application/json") && !contentType.includes("+json")) return null;
+  return res.json().catch(() => null);
 }
 
 export default function RelatoriosPage() {
-  const [fFarm, setFFarm] = useState("all");
-  const [fTractor, setFTractor] = useState("all");
-  const [fOperator, setFOperator] = useState("");
-  const [fStatus, setFStatus] = useState("all");
-  const [fPeriod, setFPeriod] = useState("7");
+  const [fichas, setFichas] = useState<FichaOperacional[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
-  const [fichas, setFichas] = useState<FichaOperacional[]>([]);
-  const [selectedFicha, setSelectedFicha] = useState<FichaOperacional | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [drawerFicha, setDrawerFicha] = useState<DrawerFicha | null>(null);
+  const [drawerDraft, setDrawerDraft] = useState<DrawerFicha | null>(null);
+  const [exporting, setExporting] = useState<null | FichaExportFormat>(null);
+  const [fEquipamento, setFEquipamento] = useState("");
+  const [fRegional, setFRegional] = useState("");
+  const [fUnidade, setFUnidade] = useState("");
+  const [fGrupo, setFGrupo] = useState("");
+  const [fTipo, setFTipo] = useState("all");
+  const [fStatus, setFStatus] = useState<"all" | FichaStatus>("all");
+  const [fDataIni, setFDataIni] = useState("");
+  const [fDataFim, setFDataFim] = useState("");
+  const [somenteInconsistentes, setSomenteInconsistentes] = useState(false);
+  const [integracaoOpen, setIntegracaoOpen] = useState(false);
+  const [integracaoLoading, setIntegracaoLoading] = useState(false);
+  const [integracaoResumo, setIntegracaoResumo] = useState<FichaIntegracaoResumo | null>(null);
+  const [historicoOpen, setHistoricoOpen] = useState(false);
+  const [historicoLoading, setHistoricoLoading] = useState(false);
+  const [historicoRows, setHistoricoRows] = useState<Array<Record<string, unknown>>>([]);
+  const refreshRef = useRef<(() => Promise<void>) | null>(null);
 
-  const loadFichas = useCallback(async (quiet = false) => {
+  const load = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true);
+
     try {
+      if (IS_DEMO || IS_LOCAL) {
+        const local = readLocalFichas();
+        if (local.length === 0) {
+          const seed = buildDemoFichas();
+          writeLocalFichas(seed);
+          setFichas(seed);
+        } else {
+          setFichas(local);
+        }
+        setNotice(IS_DEMO ? "Ambiente demonstrativo: exportação local habilitada." : "Modo local: dados demonstrativos carregados em localStorage.");
+        setErr(null);
+        return;
+      }
+
       const res = await fetch("/api/fichas-operacionais", { cache: "no-store", signal: AbortSignal.timeout(9000) });
+      const data = await readJsonSafe(res);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      setFichas(Array.isArray(data) ? data : []);
+
+      const list = Array.isArray(data) ? data : Array.isArray(data?.fichas) ? data.fichas : [];
+      setFichas(normalizeFichaList(list));
+      setNotice(data && typeof data === "object" && typeof data.status_tecnico === "string" ? data.status_tecnico : null);
       setErr(null);
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Falha na conexão com o servidor de relatórios");
+      if (IS_DEMO || IS_LOCAL) {
+        const seed = buildDemoFichas();
+        writeLocalFichas(seed);
+        setFichas(seed);
+        setErr(null);
+      } else {
+        setErr(e instanceof Error ? e.message : "Serviço de fichas indisponível.");
+      }
     } finally {
       setLoading(false);
     }
   }, []);
 
+  refreshRef.current = () => load(true);
+
   useEffect(() => {
-    loadFichas();
-    const id = setInterval(() => loadFichas(true), 30000);
+    load();
+    const id = setInterval(() => refreshRef.current?.(), 30000);
     return () => clearInterval(id);
-  }, [loadFichas]);
+  }, [load]);
 
-  const filtered = fichas.filter((f) => {
-    if (fTractor !== "all" && f.trator_id !== fTractor) return false;
-    if (fFarm !== "all") {
-      const fz = (f.fazenda || "").toLowerCase();
-      if (fFarm === "bela" && !fz.includes("bela")) return false;
-      if (fFarm === "grande" && !fz.includes("grande")) return false;
+  const filtered = useMemo(() => {
+    return fichas.filter(ficha => {
+      if (fEquipamento && !ficha.equipamentoId.toLowerCase().includes(fEquipamento.toLowerCase())) return false;
+      if (fRegional && !ficha.regiao.toLowerCase().includes(fRegional.toLowerCase())) return false;
+      if (fUnidade && !ficha.unidade.toLowerCase().includes(fUnidade.toLowerCase())) return false;
+      if (fGrupo && !ficha.grupoEquipamento.toLowerCase().includes(fGrupo.toLowerCase())) return false;
+      if (fStatus !== "all" && ficha.status !== fStatus) return false;
+      if (fTipo !== "all" && ficha.tipoEquipamento.toLowerCase() !== fTipo.toLowerCase()) return false;
+      if (somenteInconsistentes && ficha.status !== "INCONSISTENTE") return false;
+      if (fDataIni && new Date(ficha.dataHoraLocal).getTime() < startOfDay(fDataIni)) return false;
+      if (fDataFim && new Date(ficha.dataHoraLocal).getTime() > endOfDay(fDataFim)) return false;
+      return true;
+    });
+  }, [fDataFim, fDataIni, fEquipamento, fGrupo, fRegional, fStatus, fTipo, fUnidade, fichas, somenteInconsistentes]);
+
+  const selectedRecords = useMemo(() => {
+    const source = selectedIds.length > 0 ? fichas : filtered;
+    return source.filter(ficha => selectedIds.length === 0 || selectedIds.includes(ficha.id_local));
+  }, [fichas, filtered, selectedIds]);
+
+  const integrationTarget = useMemo(() => selectedIds.length > 0 ? selectedRecords : [], [selectedIds.length, selectedRecords]);
+  const integrationEligible = useMemo(() => integrationTarget.filter(f => canIntegrateFicha(f).ok), [integrationTarget]);
+  const integrationBlocked = useMemo(() => integrationTarget.filter(f => !canIntegrateFicha(f).ok), [integrationTarget]);
+  const integrationBlockedLines = useMemo(
+    () => integrationBlocked.map(f => `${f.equipamentoId} - ${canIntegrateFicha(f).reason || "Erro técnico"}`),
+    [integrationBlocked],
+  );
+
+  const counts = useMemo(() => ({
+    total: fichas.length,
+    pendentes: fichas.filter(f => f.status === "PENDENTE").length,
+    exportadas: fichas.filter(f => f.status === "EXPORTADO").length,
+    inconsistentes: fichas.filter(f => f.status === "INCONSISTENTE").length,
+    horasTotais: fichas.reduce((sum, ficha) => sum + ficha.horas, 0),
+    indeterminadoPct: fichas.reduce((sum, ficha) => sum + getHorasIndeterminadas(ficha), 0) / Math.max(fichas.reduce((sum, ficha) => sum + ficha.horas, 0), 1) * 100,
+  }), [fichas]);
+
+  const allFilteredSelected = filtered.length > 0 && filtered.every(f => selectedIds.includes(f.id_local));
+
+  async function persistRecords(updated: FichaOperacional[]) {
+    if (IS_DEMO || IS_LOCAL) {
+      writeLocalFichas(updated);
+      setFichas(updated);
+      return;
     }
-    if (fOperator.trim()) {
-      const query = fOperator.toLowerCase();
-      if (!(f.nome_operador || "").toLowerCase().includes(query) && !f.operador_id.toLowerCase().includes(query)) return false;
+
+    setFichas(updated);
+    await Promise.allSettled(
+      updated.map(ficha =>
+        fetch(`/api/fichas-operacionais/${ficha.id_local}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(ficha),
+        }),
+      ),
+    );
+  }
+
+  function openDrawer(ficha: FichaOperacional) {
+    setDrawerFicha(ficha);
+    setDrawerDraft({ ...ficha });
+  }
+
+  function closeDrawer() {
+    setDrawerFicha(null);
+    setDrawerDraft(null);
+  }
+
+  async function saveDrawer() {
+    if (!drawerDraft) return;
+
+    const nextStatus: FichaStatus =
+      drawerDraft.status === "INCONSISTENTE" && drawerDraft.fazenda && drawerDraft.zona && drawerDraft.talhao && drawerDraft.centroCusto
+        ? "ATUALIZADO"
+        : drawerDraft.status;
+
+    const next: FichaOperacional = {
+      ...drawerDraft,
+      status: nextStatus,
+      exportadoEm: nextStatus === "EXPORTADO" && !drawerDraft.exportadoEm ? new Date().toISOString() : drawerDraft.exportadoEm,
+    };
+
+    const updated = fichas.map(ficha => (ficha.id_local === next.id_local ? next : ficha));
+    await persistRecords(updated);
+    setNotice(nextStatus === "INCONSISTENTE" && fichaNeedsCorrection(next)
+      ? "Ficha inconsistente: complete fazenda, zona, talhão e centro de custo antes de exportar."
+      : "Ficha atualizada.");
+    closeDrawer();
+  }
+
+  async function exportRecords(format: FichaExportFormat) {
+    setNotice(null);
+    const target = selectedRecords;
+
+    if (target.length === 0) {
+      setNotice("Nenhuma ficha disponível para exportação.");
+      return;
     }
-    if (fStatus !== "all" && f.status?.toUpperCase() !== fStatus.toUpperCase()) return false;
-    if (fPeriod !== "all" && f.inicio) {
-      const diffDays = (Date.now() - new Date(f.inicio).getTime()) / (1000 * 60 * 60 * 24);
-      if (fPeriod === "today" && diffDays > 1) return false;
-      if (fPeriod === "7" && diffDays > 7) return false;
-      if (fPeriod === "30" && diffDays > 30) return false;
+
+    const validation = canExportAll(target);
+    if (!validation.ok) {
+      setNotice(validation.reason || "Não foi possível exportar.");
+      const blocked = target.find(f => f.status === "INCONSISTENTE" && fichaNeedsCorrection(f)) || target.find(f => f.status === "EXPORTADO");
+      if (blocked) openDrawer(blocked);
+      return;
     }
-    return true;
-  });
 
-  const exportCSV = () => {
-    const headers = ["ID Local","Trator","Operador","Fazenda","Talhao","Status","Inicio","Fim","H. Inicial","H. Final","Delta","Area Trab (ha)"];
-    const rows = filtered.map(f => [f.id_local, f.trator_id, f.nome_operador || f.operador_id, f.fazenda || "", f.talhao || "", f.status, f.inicio || "", f.fim || "", f.horimetro_fisico_inicial, f.horimetro_fisico_final ?? "", f.horimetro_delta ?? "", f.area_trabalhada ?? ""]);
-    const content = "\uFEFF" + [headers.join(","), ...rows.map(r => r.map(v => `"${String(v)}"`).join(","))].join("\n");
-    const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `sil_fichas_${new Date().toISOString().slice(0, 10)}.csv`;
-    link.click();
-  };
+    setExporting(format);
+    try {
+      if (IS_DEMO || IS_LOCAL) {
+        const text = format === "txt" ? gerarTXT(target) : gerarCSV(target);
+        downloadText(text, `sil_fichas_${new Date().toISOString().slice(0, 10)}.${format}`, format === "txt" ? "text/plain" : "text/csv");
+        const exportedAt = new Date().toISOString();
+        await persistRecords(applyLocalExportState(fichas, target, exportedAt));
+        setNotice(`Arquivo ${format.toUpperCase()} gerado com dados demonstrativos.`);
+        return;
+      }
 
-  const totalHoras = filtered.reduce((acc, c) => acc + (c.horimetro_delta || 0), 0);
-  const totalArea = filtered.reduce((acc, c) => acc + (c.area_trabalhada || 0), 0);
-  const avgEficiencia = filtered.length > 0 ? (filtered.reduce((acc, c) => acc + (c.tempo_produtivo_segundos || 0), 0) / filtered.reduce((acc, c) => acc + ((c.tempo_produtivo_segundos || 0) + (c.tempo_parado_segundos || 0) || 1), 0) * 100).toFixed(1) : "0.0";
+      const res = await fetch("/api/fichas-operacionais/exportar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ formato: format, fichas: target }),
+      });
 
-  const getStatusBadge = (status: string) => {
-    const s = (status || "").toUpperCase();
-    if (s === "FINALIZADA") return { label: "Finalizada", variant: "online" as const };
-    if (s === "EM_ANDAMENTO") return { label: "Em Campo", variant: "instavel" as const };
-    return { label: s, variant: "offline" as const };
-  };
+      if (!res.ok) {
+        const data = await readJsonSafe(res);
+        setNotice((data && typeof data === "object" && typeof data.status_tecnico === "string" && data.status_tecnico) || "Falha técnica na exportação.");
+        return;
+      }
+
+      const text = await res.text();
+      downloadText(text, `sil_fichas_${new Date().toISOString().slice(0, 10)}.${format}`, format === "txt" ? "text/plain" : "text/csv");
+      const exportedAt = new Date().toISOString();
+      await persistRecords(applyLocalExportState(fichas, target, exportedAt));
+      setNotice(`Arquivo ${format.toUpperCase()} exportado com sucesso.`);
+    } catch {
+      setNotice("Serviço de exportação temporariamente indisponível.");
+    } finally {
+      setExporting(null);
+    }
+  }
+
+  async function integrateSelected(tipo: TipoIntegracao) {
+    setIntegracaoLoading(true);
+    setIntegracaoResumo(null);
+    setNotice(null);
+
+    if (selectedIds.length === 0) {
+      setNotice("Selecione ao menos uma ficha para integrar.");
+      setIntegracaoLoading(false);
+      return;
+    }
+
+    if (integrationEligible.length === 0) {
+      setNotice(integrationBlockedLines[0] || "Nenhuma ficha elegível para integração.");
+      const blocked = integrationTarget.find(f => !canIntegrateFicha(f).ok);
+      if (blocked) openDrawer(blocked);
+      setIntegracaoLoading(false);
+      return;
+    }
+
+    const resumoBase = buildIntegracaoResumo(integrationTarget);
+
+    if (tipo === "ARQUIVO_DE_TEXTO") {
+      await exportRecords("txt");
+      setIntegracaoResumo(resumoBase);
+      setIntegracaoOpen(false);
+      setIntegracaoLoading(false);
+      return;
+    }
+
+    try {
+      if (IS_DEMO || IS_LOCAL) {
+        const exportedAt = new Date().toISOString();
+        await persistRecords(applyLocalExportState(fichas, integrationEligible, exportedAt));
+        setIntegracaoResumo({ ...resumoBase, alterados: integrationEligible.length });
+        setNotice("Integração simulada com persistência local concluída.");
+        setIntegracaoOpen(false);
+        return;
+      }
+
+      const res = await fetch("/api/fichas-operacionais/integrar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fichas: integrationEligible, tipo }),
+      });
+      const data = await readJsonSafe(res);
+
+      if (!res.ok) {
+        setNotice((data && typeof data === "object" && typeof data.status_tecnico === "string" && data.status_tecnico) || "Falha técnica na integração.");
+        return;
+      }
+
+      const exportedAt = new Date().toISOString();
+      await persistRecords(applyLocalExportState(fichas, integrationEligible, exportedAt));
+      setIntegracaoResumo(
+        data && typeof data === "object"
+          ? {
+              total: Number((data as { total?: number }).total ?? resumoBase.total),
+              incluidos: Number((data as { incluidos?: number }).incluidos ?? resumoBase.incluidos),
+              alterados: Number((data as { alterados?: number }).alterados ?? resumoBase.alterados),
+              erros: Number((data as { erros?: number }).erros ?? resumoBase.erros),
+              linhasComErro: Array.isArray((data as { linhasComErro?: unknown[] }).linhasComErro)
+                ? (data as { linhasComErro: string[] }).linhasComErro
+                : resumoBase.linhasComErro,
+            }
+          : resumoBase,
+      );
+      setNotice("Integração concluída.");
+      setIntegracaoOpen(false);
+    } catch {
+      setNotice("Serviço de integração temporariamente indisponível.");
+    } finally {
+      setIntegracaoLoading(false);
+    }
+  }
+
+  async function loadHistorico() {
+    setHistoricoOpen(true);
+    setHistoricoLoading(true);
+    try {
+      const res = await fetch("/api/fichas-operacionais/historico", { cache: "no-store" });
+      const data = await readJsonSafe(res);
+      setHistoricoRows(Array.isArray(data?.historico) ? data.historico : []);
+      if (data && typeof data.status_tecnico === "string") setNotice(data.status_tecnico);
+    } catch {
+      setHistoricoRows([]);
+      setNotice("Histórico indisponível no momento.");
+    } finally {
+      setHistoricoLoading(false);
+    }
+  }
+
+  function toggleSelected(id: string) {
+    setSelectedIds(prev => (prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]));
+  }
+
+  function toggleSelectVisible() {
+    setSelectedIds(allFilteredSelected ? [] : filtered.map(f => f.id_local));
+  }
 
   return (
     <div className="flex-1 flex flex-col min-h-screen">
-      <Header title="Relatórios Oficiais" sub="Fichas operacionais e consolidação de produtividade" />
+      <Header title="Fichas & Relatórios" sub="Controle operacional, correções e exportação de fichas do operador" />
 
-      <main className="p-8 space-y-8 flex-1 animate-fade-in max-w-[1920px] mx-auto w-full">
+      <main className="p-6 space-y-6">
+        {notice && (
+          <div className="card-p border border-[#f59e0b]/20 bg-[#f59e0b]/5">
+            <p className="text-[#f59e0b] font-semibold text-sm">Aviso</p>
+            <p className="text-[#4a6a8a] text-xs mt-1">{notice}</p>
+          </div>
+        )}
+        {err && (
+          <div className="card-p border border-[#ef4444]/20 bg-[#ef4444]/5">
+            <p className="text-[#ef4444] font-semibold text-sm">Status técnico</p>
+            <p className="text-[#4a6a8a] text-xs mt-1">{err}</p>
+          </div>
+        )}
 
-        {/* Top Analytics */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="card-p bg-gradient-to-br from-[#22c55e]/10 to-transparent">
-                <div className="flex justify-between items-start">
-                    <div>
-                        <p className="text-[#4a6a8a] text-[10px] font-black uppercase tracking-[0.2em]">Total Horímetro</p>
-                        <p className="text-4xl font-black text-[#22c55e] mt-2 font-mono">{totalHoras.toFixed(1)}h</p>
-                    </div>
-                    <div className="w-12 h-12 rounded-2xl bg-[#22c55e]/10 border border-[#22c55e]/20 flex items-center justify-center text-[#22c55e]">
-                        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    </div>
-                </div>
+        <div className="grid grid-cols-2 xl:grid-cols-6 gap-4">
+          {[
+            { label: "Total de fichas", value: counts.total, color: "text-[#00d4ff]" },
+            { label: "Pendentes", value: counts.pendentes, color: "text-[#f59e0b]" },
+            { label: "Exportadas", value: counts.exportadas, color: "text-[#22c55e]" },
+            { label: "Inconsistentes", value: counts.inconsistentes, color: "text-[#ef4444]" },
+            { label: "Horas totais", value: counts.horasTotais.toFixed(2), color: "text-[#8b5cf6]" },
+            { label: "Indeterminado %", value: `${counts.indeterminadoPct.toFixed(1)}%`, color: "text-[#f59e0b]" },
+          ].map(card => (
+            <div key={card.label} className="card-p">
+              <p className="text-[#4a6a8a] text-[10px] uppercase font-semibold tracking-wider">{card.label}</p>
+              <p className={`${card.color} text-2xl font-bold font-mono mt-1`}>{card.value}</p>
             </div>
-            <div className="card-p bg-gradient-to-br from-[#00d4ff]/10 to-transparent">
-                <div className="flex justify-between items-start">
-                    <div>
-                        <p className="text-[#4a6a8a] text-[10px] font-black uppercase tracking-[0.2em]">Área Trabalhada</p>
-                        <p className="text-4xl font-black text-[#00d4ff] mt-2 font-mono">{totalArea.toFixed(1)}<span className="text-sm ml-1 opacity-50">ha</span></p>
-                    </div>
-                    <div className="w-12 h-12 rounded-2xl bg-[#00d4ff]/10 border border-[#00d4ff]/20 flex items-center justify-center text-[#00d4ff]">
-                        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    </div>
-                </div>
-            </div>
-            <div className="card-p bg-gradient-to-br from-[#f59e0b]/10 to-transparent">
-                <div className="flex justify-between items-start">
-                    <div>
-                        <p className="text-[#4a6a8a] text-[10px] font-black uppercase tracking-[0.2em]">Eficiência Global</p>
-                        <p className="text-4xl font-black text-[#f59e0b] mt-2 font-mono">{avgEficiencia}%</p>
-                    </div>
-                    <div className="w-12 h-12 rounded-2xl bg-[#f59e0b]/10 border border-[#f59e0b]/20 flex items-center justify-center text-[#f59e0b]">
-                        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
-                    </div>
-                </div>
-            </div>
+          ))}
         </div>
 
-        {/* Search & Filters */}
-        <div className="card-p bg-[#101b2d]/40 space-y-6">
-            <div className="flex items-center justify-between">
-                <h3 className="text-white font-black text-xs uppercase tracking-widest">Painel de Filtragem Avançada</h3>
-                <button onClick={() => loadFichas()} className="text-[#00d4ff] text-[10px] font-black uppercase tracking-widest hover:underline">Atualizar Base</button>
+        <div className="card-p space-y-4">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <SectionHeader title="Filtro de Fichas" sub="Seleção por equipamento, status, tipo e período" />
+            <div className="flex gap-2 flex-wrap">
+              <button
+                onClick={() => {
+                  if (selectedIds.length === 0) {
+                    setNotice("Selecione ao menos uma ficha para integrar.");
+                    return;
+                  }
+                  setIntegracaoResumo(null);
+                  setIntegracaoOpen(true);
+                }}
+                className="btn-primary"
+              >
+                Integrar Selecionados
+              </button>
+              <button onClick={loadHistorico} className="btn-ghost border border-[#1f334d]">Histórico</button>
+              <button onClick={() => exportRecords("csv")} className="btn-primary" disabled={exporting !== null}>
+                {exporting === "csv" ? "Gerando..." : "Exportar CSV"}
+              </button>
+              <button onClick={() => exportRecords("txt")} className="btn-ghost border border-[#1f334d]" disabled={exporting !== null}>
+                {exporting === "txt" ? "Gerando..." : "Exportar TXT"}
+              </button>
             </div>
+          </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                <div className="space-y-2">
-                    <label className="text-[#4a6a8a] text-[10px] font-black uppercase tracking-widest px-1">Fazenda</label>
-                    <select value={fFarm} onChange={e => setFFarm(e.target.value)} className="sil-input h-11">
-                        <option value="all">TODAS AS FAZENDAS</option>
-                        <option value="bela">FAZENDA BELA VISTA</option>
-                        <option value="grande">FAZENDA RIO GRANDE</option>
-                    </select>
-                </div>
-                <div className="space-y-2">
-                    <label className="text-[#4a6a8a] text-[10px] font-black uppercase tracking-widest px-1">Equipamento</label>
-                    <select value={fTractor} onChange={e => setFTractor(e.target.value)} className="sil-input h-11">
-                        <option value="all">TODOS TRATORES</option>
-                        {Array.from(new Set(fichas.map(x => x.trator_id))).map(t => (
-                            <option key={t} value={t}>{t}</option>
-                        ))}
-                    </select>
-                </div>
-                <div className="space-y-2">
-                    <label className="text-[#4a6a8a] text-[10px] font-black uppercase tracking-widest px-1">Operador</label>
-                    <input type="text" placeholder="BUSCAR NOME..." value={fOperator} onChange={e => setFOperator(e.target.value)} className="sil-input h-11" />
-                </div>
-                <div className="space-y-2">
-                    <label className="text-[#4a6a8a] text-[10px] font-black uppercase tracking-widest px-1">Status</label>
-                    <select value={fStatus} onChange={e => setFStatus(e.target.value)} className="sil-input h-11">
-                        <option value="all">TODOS STATUS</option>
-                        <option value="FINALIZADA">FINALIZADA</option>
-                        <option value="EM_ANDAMENTO">EM ANDAMENTO</option>
-                    </select>
-                </div>
-                <div className="space-y-2">
-                    <label className="text-[#4a6a8a] text-[10px] font-black uppercase tracking-widest px-1">Período</label>
-                    <select value={fPeriod} onChange={e => setFPeriod(e.target.value)} className="sil-input h-11">
-                        <option value="today">HOJE</option>
-                        <option value="7">ÚLTIMOS 7 DIAS</option>
-                        <option value="30">ÚLTIMOS 30 DIAS</option>
-                        <option value="all">HISTÓRICO COMPLETO</option>
-                    </select>
-                </div>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 xl:grid-cols-8 gap-3">
+            <input className="sil-input md:col-span-2" placeholder="Busca geral" value={fEquipamento} onChange={e => setFEquipamento(e.target.value)} />
+            <input className="sil-input" placeholder="Regional" value={fRegional} onChange={e => setFRegional(e.target.value)} />
+            <input className="sil-input" placeholder="Unidade" value={fUnidade} onChange={e => setFUnidade(e.target.value)} />
+            <input className="sil-input" placeholder="Grupo" value={fGrupo} onChange={e => setFGrupo(e.target.value)} />
+            <input className="sil-input" placeholder="Tipo equipamento" value={fTipo === "all" ? "" : fTipo} onChange={e => setFTipo(e.target.value || "all")} />
+            <select className="sil-input" value={fStatus} onChange={e => setFStatus(e.target.value as "all" | FichaStatus)}>
+              <option value="all">Todos os status</option>
+              <option value="PENDENTE">Pendente</option>
+              <option value="EXPORTADO">Exportada</option>
+              <option value="ATUALIZADO">Atualizada</option>
+              <option value="INCONSISTENTE">Inconsistente</option>
+            </select>
+            <input className="sil-input" type="date" value={fDataIni} onChange={e => setFDataIni(e.target.value)} />
+            <input className="sil-input" type="date" value={fDataFim} onChange={e => setFDataFim(e.target.value)} />
+            <label className="flex items-center gap-2 text-xs text-[#c8d8e8] font-semibold">
+              <input type="checkbox" checked={somenteInconsistentes} onChange={e => setSomenteInconsistentes(e.target.checked)} />
+              Somente inconsistentes
+            </label>
+          </div>
         </div>
 
-        {err && <ApiErr label="RELATÓRIOS" msg={err} />}
-
-        {/* Results Table */}
         <div className="card overflow-hidden">
-            <div className="px-8 py-6 border-b border-[#1f334d] flex justify-between items-center bg-[#101b2d]/50">
-                <div>
-                    <h3 className="text-white font-black text-sm uppercase tracking-widest">Fichas Operacionais Consolidadas</h3>
-                    <p className="text-[#4a6a8a] text-[10px] font-bold uppercase mt-1 opacity-60">{filtered.length} Registros Processados</p>
-                </div>
-                <button onClick={exportCSV} className="btn-primary flex items-center gap-2">
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                    EXPORTAR CSV
-                </button>
+          <div className="px-6 py-4 border-b border-[#1f334d] flex items-center justify-between gap-3 flex-wrap bg-[#101b2d]/50">
+            <div>
+              <h3 className="text-white font-black text-sm uppercase tracking-widest">Fichas Operacionais</h3>
+              <p className="text-[#4a6a8a] text-[10px] font-bold uppercase mt-1 opacity-60">{filtered.length} registros filtrados</p>
             </div>
+            <button onClick={toggleSelectVisible} className="text-[#00d4ff] text-[10px] font-black uppercase tracking-widest hover:underline">
+              {allFilteredSelected ? "Limpar seleção" : "Selecionar visíveis"} {selectedIds.length > 0 ? `(${selectedIds.length})` : ""}
+            </button>
+          </div>
 
-            <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                    <thead>
-                        <tr className="bg-[#0d1420] border-b border-[#1f334d] text-[#4a6a8a] font-black uppercase tracking-[0.2em] text-left">
-                            <th className="px-8 py-5">ID Local / Início</th>
-                            <th className="px-8 py-5">Máquina</th>
-                            <th className="px-8 py-5">Operador</th>
-                            <th className="px-8 py-5 text-center">Delta Horím.</th>
-                            <th className="px-8 py-5 text-center">Área (ha)</th>
-                            <th className="px-8 py-5">Status</th>
-                            <th className="px-8 py-5 text-right">Detalhes</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#1f334d]/40">
-                        {loading && fichas.length === 0 ? (
-                            Array.from({length: 5}).map((_, i) => (
-                                <tr key={i} className="animate-pulse"><td colSpan={7} className="px-8 py-6"><div className="h-4 bg-[#1f334d]/50 rounded w-full" /></td></tr>
-                            ))
-                        ) : filtered.length === 0 ? (
-                            <tr><td colSpan={7} className="py-24 text-center"><Empty icon="📄" title="Nenhuma ficha" sub="Altere os filtros para localizar registros." /></td></tr>
-                        ) : filtered.map(r => {
-                            const badge = getStatusBadge(r.status);
-                            return (
-                                <tr key={r.id_local} className="hover:bg-[#00d4ff]/5 transition-all group">
-                                    <td className="px-8 py-6">
-                                        <p className="text-white font-black text-xs font-mono group-hover:text-[#00d4ff] transition-colors">{r.id_local.slice(-8).toUpperCase()}</p>
-                                        <p className="text-[#4a6a8a] text-[10px] font-bold mt-1 uppercase">{r.inicio ? fmtDate(r.inicio) : "--"}</p>
-                                    </td>
-                                    <td className="px-8 py-6">
-                                        <p className="text-white font-black text-sm tracking-tight">{r.trator_id}</p>
-                                        <p className="text-[#4a6a8a] text-[10px] font-black uppercase mt-1 opacity-60">{r.fazenda || "--"}</p>
-                                    </td>
-                                    <td className="px-8 py-6">
-                                        <p className="text-white font-bold text-sm tracking-tight">{r.nome_operador || "--"}</p>
-                                        <p className="text-[#4a6a8a] text-[10px] font-mono mt-1 opacity-60">MAT: {r.operador_id}</p>
-                                    </td>
-                                    <td className="px-8 py-6 text-center">
-                                        <span className="text-[#22c55e] font-black font-mono text-sm">+{r.horimetro_delta?.toFixed(2) || "0.00"}h</span>
-                                    </td>
-                                    <td className="px-8 py-6 text-center text-white font-black font-mono text-sm">
-                                        {r.area_trabalhada?.toFixed(2) || "0.00"}
-                                    </td>
-                                    <td className="px-8 py-6">
-                                        <Badge label={badge.label} variant={badge.variant} dot={r.status === "EM_ANDAMENTO"} />
-                                    </td>
-                                    <td className="px-8 py-6 text-right">
-                                        <button onClick={() => setSelectedFicha(r)} className="p-3 rounded-xl bg-[#0d1420] border border-[#1f334d] text-[#4a6a8a] hover:text-[#00d4ff] hover:border-[#00d4ff]/40 transition-all shadow-md">
-                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                                        </button>
-                                    </td>
-                                </tr>
-                            );
-                        })}
-                    </tbody>
-                </table>
+          {loading ? (
+            <div className="p-6 space-y-3">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="h-14 rounded-xl bg-[#0d1420] animate-pulse" />
+              ))}
             </div>
+          ) : filtered.length === 0 ? (
+            <div className="py-24">
+              <EmptyState title="Nenhuma ficha" sub="Altere filtros ou carregue a base demonstrativa." />
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-[#0d1420] border-b border-[#1f334d] text-[#4a6a8a] font-black uppercase tracking-[0.2em] text-left">
+                    <th className="px-4 py-4">
+                      <input type="checkbox" checked={allFilteredSelected} onChange={toggleSelectVisible} />
+                    </th>
+                    <th className="px-4 py-4">Regional</th>
+                    <th className="px-4 py-4">Unidade</th>
+                    <th className="px-4 py-4">Grupo de Equipamento</th>
+                    <th className="px-4 py-4">Equipamento</th>
+                    <th className="px-4 py-4">Tipo de Equipamento</th>
+                    <th className="px-4 py-4">Data</th>
+                    <th className="px-4 py-4">Status</th>
+                    <th className="px-4 py-4">Horas</th>
+                    <th className="px-4 py-4">Horas Indeterminado</th>
+                    <th className="px-4 py-4">% Indeterminado</th>
+                    <th className="px-4 py-4">Inconsistência</th>
+                    <th className="px-4 py-4">Validação</th>
+                    <th className="px-4 py-4 text-right">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#1f334d]/40">
+                  {filtered.map(ficha => (
+                    <tr key={ficha.id_local} className="hover:bg-[#00d4ff]/5 transition-all">
+                      <td className="px-4 py-4">
+                        <input type="checkbox" checked={selectedIds.includes(ficha.id_local)} onChange={() => toggleSelected(ficha.id_local)} />
+                      </td>
+                      <td className="px-4 py-4 text-white font-bold">{ficha.regiao}</td>
+                      <td className="px-4 py-4 text-white font-bold">{ficha.unidade}</td>
+                      <td className="px-4 py-4 text-white font-bold">{ficha.grupoEquipamento}</td>
+                      <td className="px-4 py-4">
+                        <p className="text-white font-black text-sm">{ficha.equipamentoId}</p>
+                      </td>
+                      <td className="px-4 py-4 text-[#c8d8e8] uppercase text-xs font-bold">{ficha.tipoEquipamento}</td>
+                      <td className="px-4 py-4">
+                        <p className="text-white font-mono text-xs">{fmtShortDate(ficha.dataHoraLocal)}</p>
+                      </td>
+                      <td className="px-4 py-4">
+                        <Badge label={statusMeta(ficha.status).label} variant={statusMeta(ficha.status).variant} dot={false} />
+                      </td>
+                      <td className="px-4 py-4 text-white font-bold">{ficha.horas.toFixed(2)} h</td>
+                      <td className="px-4 py-4 text-white font-bold">{getHorasIndeterminadas(ficha).toFixed(2)}</td>
+                      <td className="px-4 py-4 text-white font-bold">{getPercentualIndeterminado(ficha).toFixed(1)}%</td>
+                      <td className="px-4 py-4 text-[#c8d8e8] text-xs">
+                        {ficha.status === "INCONSISTENTE" ? (fichaNeedsCorrection(ficha) ? "Fazenda, zona, talhão e centro de custo" : "Corrigida") : "Sem inconsistência"}
+                      </td>
+                      <td className="px-4 py-4 text-[#c8d8e8] text-xs">
+                        {ficha.status === "INCONSISTENTE"
+                          ? (fichaNeedsCorrection(ficha) ? "Pendente de validação" : "Validação OK")
+                          : "Validação OK"}
+                      </td>
+                      <td className="px-4 py-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button onClick={() => openDrawer(ficha)} className="btn-ghost">Detalhes</button>
+                          <button onClick={() => openDrawer(ficha)} className="btn-ghost border border-[#f59e0b]/30 text-[#f59e0b]">Alterar inconsistência</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </main>
 
-      {/* Details Modal */}
-      {selectedFicha && (
-        <div className="fixed inset-0 z-[110] bg-[#07111f]/95 backdrop-blur-xl flex items-center justify-center p-4">
-            <div className="card-p w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden border-[#00d4ff]/20 shadow-2xl animate-fade-in">
-                <div className="flex items-center justify-between mb-8 pb-6 border-b border-[#1f334d]">
-                    <div>
-                        <h3 className="text-white font-black text-2xl uppercase tracking-tighter">Ficha de Telemetria Detalhada</h3>
-                        <p className="text-[#4a6a8a] text-xs font-bold uppercase tracking-widest mt-2">UUID: <span className="text-[#00d4ff] font-mono">{selectedFicha.id_local}</span></p>
-                    </div>
-                    <button onClick={() => setSelectedFicha(null)} className="w-12 h-12 rounded-2xl bg-[#0d1420] border border-[#1f334d] flex items-center justify-center text-[#4a6a8a] hover:text-white transition-colors text-2xl font-bold">&times;</button>
-                </div>
-
-                <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-8 pb-4">
-                    {/* Header Info Grid */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                        <div className="bg-[#0d1420]/80 p-5 rounded-2xl border border-[#1f334d] space-y-1">
-                            <span className="text-[#4a6a8a] text-[10px] font-black uppercase tracking-widest">Equipamento</span>
-                            <p className="text-white font-black text-base">{selectedFicha.trator_id}</p>
-                        </div>
-                        <div className="bg-[#0d1420]/80 p-5 rounded-2xl border border-[#1f334d] space-y-1">
-                            <span className="text-[#4a6a8a] text-[10px] font-black uppercase tracking-widest">Matrícula</span>
-                            <p className="text-white font-black text-base font-mono">{selectedFicha.operador_id}</p>
-                        </div>
-                        <div className="bg-[#0d1420]/80 p-5 rounded-2xl border border-[#1f334d] space-y-1">
-                            <span className="text-[#4a6a8a] text-[10px] font-black uppercase tracking-widest">Fazenda</span>
-                            <p className="text-white font-black text-sm uppercase">{selectedFicha.fazenda || "--"}</p>
-                        </div>
-                        <div className="bg-[#0d1420]/80 p-5 rounded-2xl border border-[#1f334d] space-y-1">
-                            <span className="text-[#4a6a8a] text-[10px] font-black uppercase tracking-widest">Talhão</span>
-                            <p className="text-white font-black text-sm uppercase">{selectedFicha.talhao || "--"}</p>
-                        </div>
-                    </div>
-
-                    {/* Operational Metrics */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <div className="space-y-4">
-                            <h4 className="text-white font-black text-[11px] uppercase tracking-[0.2em] border-l-4 border-[#00d4ff] pl-3">Tempos e Movimentos</h4>
-                            <div className="card bg-[#0d1420]/40 p-6 space-y-4 border-[#1f334d]/50">
-                                <div className="flex justify-between items-center py-1">
-                                    <span className="text-[#4a6a8a] text-xs font-bold uppercase">Início Jornada</span>
-                                    <span className="text-white font-black text-xs uppercase font-mono">{selectedFicha.inicio ? fmtDate(selectedFicha.inicio) : "--"}</span>
-                                </div>
-                                <div className="flex justify-between items-center py-1">
-                                    <span className="text-[#4a6a8a] text-xs font-bold uppercase">Fim Jornada</span>
-                                    <span className="text-white font-black text-xs uppercase font-mono">{selectedFicha.fim ? fmtDate(selectedFicha.fim) : "--"}</span>
-                                </div>
-                                <div className="flex justify-between items-center py-1 border-t border-[#1f334d]/50 pt-4">
-                                    <span className="text-[#4a6a8a] text-xs font-bold uppercase">Tempo Produtivo</span>
-                                    <span className="text-[#22c55e] font-black text-base font-mono">{fmtDur(selectedFicha.tempo_produtivo_segundos)}</span>
-                                </div>
-                                <div className="flex justify-between items-center py-1">
-                                    <span className="text-[#4a6a8a] text-xs font-bold uppercase">Tempo Parado</span>
-                                    <span className="text-[#f59e0b] font-black text-base font-mono">{fmtDur(selectedFicha.tempo_parado_segundos)}</span>
-                                </div>
-                                <div className="flex justify-between items-center py-1">
-                                    <span className="text-[#4a6a8a] text-xs font-bold uppercase">Qtde Paradas</span>
-                                    <span className="text-white font-black text-base font-mono">{selectedFicha.qtd_paradas ?? 0} <span className="text-[10px] opacity-40 uppercase">VEZES</span></span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="space-y-4">
-                            <h4 className="text-white font-black text-[11px] uppercase tracking-[0.2em] border-l-4 border-[#22c55e] pl-3">Medições Técnicas</h4>
-                            <div className="card bg-[#0d1420]/40 p-6 space-y-4 border-[#1f334d]/50">
-                                <div className="flex justify-between items-center py-1">
-                                    <span className="text-[#4a6a8a] text-xs font-bold uppercase">Horímetro Inicial</span>
-                                    <span className="text-white font-black text-base font-mono">{selectedFicha.horimetro_fisico_inicial.toFixed(2)}h</span>
-                                </div>
-                                <div className="flex justify-between items-center py-1">
-                                    <span className="text-[#4a6a8a] text-xs font-bold uppercase">Horímetro Final</span>
-                                    <span className="text-white font-black text-base font-mono">{selectedFicha.horimetro_fisico_final?.toFixed(2) || "--"}h</span>
-                                </div>
-                                <div className="flex justify-between items-center py-1 border-t border-[#1f334d]/50 pt-4">
-                                    <span className="text-[#4a6a8a] text-xs font-bold uppercase">Consumo de Horas (Δ)</span>
-                                    <span className="text-[#22c55e] font-black text-xl font-mono">+{selectedFicha.horimetro_delta?.toFixed(2) || "0.00"}h</span>
-                                </div>
-                                <div className="flex justify-between items-center py-1">
-                                    <span className="text-[#4a6a8a] text-xs font-bold uppercase">Rendimento de Área</span>
-                                    <span className="text-[#00d4ff] font-black text-xl font-mono">{selectedFicha.area_trabalhada?.toFixed(2) || "0.00"} ha</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Payload JSON */}
-                    <div className="space-y-4 pt-4">
-                        <h4 className="text-[#4a6a8a] text-[10px] font-black uppercase tracking-widest px-1">Pacote de Telemetria Bruto</h4>
-                        <pre className="bg-[#0d1420] text-[#00d4ff]/80 text-[10px] font-mono p-6 rounded-[22px] overflow-x-auto border border-[#1f334d] shadow-inner leading-relaxed">
-                            {JSON.stringify(selectedFicha.payload_json || {}, null, 4)}
-                        </pre>
-                    </div>
-                </div>
-
-                <div className="pt-6 flex justify-end gap-4 border-t border-[#1f334d]">
-                    <button onClick={() => setSelectedFicha(null)} className="btn-primary px-10 h-14">Fechar Visualização</button>
-                </div>
+      {drawerFicha && drawerDraft && (
+        <div className="fixed inset-0 z-[120] bg-black/70 flex justify-end">
+          <div className="w-full max-w-3xl h-full bg-[#07111f] border-l border-[#1f334d] shadow-2xl overflow-y-auto">
+            <div className="sticky top-0 bg-[#07111f]/95 backdrop-blur border-b border-[#1f334d] p-5 flex items-center justify-between">
+              <div>
+                <h3 className="text-white font-black text-lg">Detalhes da ficha</h3>
+                <p className="text-[#4a6a8a] text-xs font-mono">{drawerFicha.id_local}</p>
+              </div>
+              <button onClick={closeDrawer} className="text-[#4a6a8a] hover:text-white text-2xl font-black">&times;</button>
             </div>
+
+            <div className="p-5 space-y-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {EDITABLE_FIELDS.map(([key, label]) => (
+                  <label key={key} className="space-y-1">
+                    <span className="text-[#4a6a8a] text-[10px] font-black uppercase tracking-widest px-1">{label}</span>
+                    <input
+                      className="sil-input"
+                      value={getEditableValue(drawerDraft, key)}
+                      onChange={e => setDrawerDraft({ ...drawerDraft, [key]: e.target.value } as DrawerFicha)}
+                    />
+                  </label>
+                ))}
+
+                <label className="space-y-1">
+                  <span className="text-[#4a6a8a] text-[10px] font-black uppercase tracking-widest px-1">Data/Hora local</span>
+                  <input
+                    className="sil-input"
+                    type="datetime-local"
+                    value={drawerDraft.dataHoraLocal.slice(0, 16)}
+                    onChange={e => setDrawerDraft({ ...drawerDraft, dataHoraLocal: e.target.value ? new Date(e.target.value).toISOString() : drawerDraft.dataHoraLocal })}
+                  />
+                </label>
+                <label className="space-y-1">
+                  <span className="text-[#4a6a8a] text-[10px] font-black uppercase tracking-widest px-1">Status</span>
+                  <select className="sil-input" value={drawerDraft.status} onChange={e => setDrawerDraft({ ...drawerDraft, status: e.target.value as FichaStatus })}>
+                    <option value="PENDENTE">Pendente</option>
+                    <option value="EXPORTADO">Exportada</option>
+                    <option value="ATUALIZADO">Atualizada</option>
+                    <option value="INCONSISTENTE">Inconsistente</option>
+                  </select>
+                </label>
+                <label className="space-y-1">
+                  <span className="text-[#4a6a8a] text-[10px] font-black uppercase tracking-widest px-1">Horas</span>
+                  <input className="sil-input" type="number" min="0" step="0.01" value={drawerDraft.horas} onChange={e => setDrawerDraft({ ...drawerDraft, horas: Number(e.target.value) })} />
+                </label>
+                <label className="space-y-1">
+                  <span className="text-[#4a6a8a] text-[10px] font-black uppercase tracking-widest px-1">Exportado em</span>
+                  <input
+                    className="sil-input"
+                    type="datetime-local"
+                    value={drawerDraft.exportadoEm ? drawerDraft.exportadoEm.slice(0, 16) : ""}
+                    onChange={e => setDrawerDraft({ ...drawerDraft, exportadoEm: e.target.value ? new Date(e.target.value).toISOString() : null })}
+                  />
+                </label>
+              </div>
+
+              {drawerDraft.status === "INCONSISTENTE" && fichaNeedsCorrection(drawerDraft) && (
+                <div className="card-p border border-[#ef4444]/20 bg-[#ef4444]/5">
+                  <p className="text-[#ef4444] font-semibold text-sm">Inconsistência pendente</p>
+                  <p className="text-[#4a6a8a] text-xs mt-1">Preencha fazenda, zona, talhão e centro de custo para liberar exportação e integração.</p>
+                </div>
+              )}
+
+              <div className="flex gap-3 justify-end">
+                <button onClick={closeDrawer} className="btn-ghost border border-[#1f334d]">Cancelar</button>
+                <button onClick={() => setDrawerDraft({ ...drawerDraft, status: "ATUALIZADO" })} className="btn-ghost border border-[#22c55e]/40 text-[#22c55e]">Marcar como atualizada</button>
+                <button onClick={saveDrawer} className="btn-primary">Salvar correção</button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
-      <footer className="p-10 text-center opacity-40">
-        <p className="text-[#4a6a8a] text-[10px] font-black uppercase tracking-[0.4em]">SILO OPS Intelligence &mdash; Analytics Platform &copy; 2024</p>
-      </footer>
+      <TipoIntegracaoModal
+        open={integracaoOpen}
+        loading={integracaoLoading}
+        selectedCount={integrationTarget.length}
+        validCount={integrationEligible.length}
+        blockedCount={integrationBlocked.length}
+        blockedLines={integrationBlockedLines}
+        summary={integracaoResumo}
+        onClose={() => {
+          setIntegracaoOpen(false);
+          setIntegracaoResumo(null);
+        }}
+        onConfirm={integrateSelected}
+      />
 
-      <style jsx global>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #1f334d; border-radius: 10px; }
-      `}</style>
+      {historicoOpen && (
+        <div className="fixed inset-0 z-[135] bg-black/70 flex items-center justify-center p-4">
+          <div className="w-full max-w-3xl rounded-3xl border border-[#1f334d] bg-[#07111f] shadow-2xl max-h-[85vh] overflow-y-auto">
+            <div className="p-6 border-b border-[#1f334d] flex items-center justify-between">
+              <div>
+                <h3 className="text-white font-black text-xl">Histórico</h3>
+                <p className="text-[#4a6a8a] text-xs mt-1">Consulta controlada de integrações e exportações.</p>
+              </div>
+              <button onClick={() => setHistoricoOpen(false)} className="text-[#4a6a8a] hover:text-white text-2xl font-black">&times;</button>
+            </div>
+            <div className="p-6 space-y-4">
+              {historicoLoading ? (
+                <div className="text-[#4a6a8a] text-sm">Carregando histórico...</div>
+              ) : historicoRows.length === 0 ? (
+                <EmptyState title="Sem histórico disponível" sub="O ambiente atual não retornou eventos de histórico." />
+              ) : (
+                <div className="space-y-3">
+                  {historicoRows.map((row, index) => (
+                    <div key={index} className="rounded-2xl border border-[#1f334d] bg-[#0d1420] p-4 text-sm text-[#c8d8e8]">
+                      <pre className="whitespace-pre-wrap">{JSON.stringify(row, null, 2)}</pre>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

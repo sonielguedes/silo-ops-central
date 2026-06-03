@@ -537,3 +537,70 @@ test("operations page exposes premium filters, status badges and detail drawer",
   assert.match(source, /Linha do tempo resumida/);
   assert.match(source, /Status sincronização/);
 });
+
+test("equipment-state.ts normalizer exists and exports normalizeEquipmentState", () => {
+  const stateSource = readFileSync(new URL("../src/lib/equipment-state.ts", import.meta.url), "utf8");
+
+  assert.match(stateSource, /export function normalizeEquipmentState/);
+  assert.match(stateSource, /export type Presence/);
+  assert.match(stateSource, /export type EstadoOperacional/);
+  assert.match(stateSource, /export interface NormalizedEquipmentState/);
+  assert.match(stateSource, /presence/);
+  assert.match(stateSource, /estado_operacional/);
+  assert.match(stateSource, /operacao_atual/);
+  assert.match(stateSource, /ultima_operacao_conhecida/);
+  assert.match(stateSource, /status_resumo/);
+  assert.match(stateSource, /TRABALHANDO/);
+  assert.match(stateSource, /PARADO/);
+  assert.match(stateSource, /EM_MOVIMENTO/);
+  assert.match(stateSource, /SEM_OPERACAO/);
+  assert.match(stateSource, /DESCONHECIDO/);
+  assert.equal(existsSync(new URL("../src/lib/equipment-state.ts", import.meta.url)), true);
+});
+
+test("equipment-details.ts uses normalizeEquipmentState and exposes new fields", () => {
+  const detailsSource = readFileSync(new URL("../src/lib/equipment-details.ts", import.meta.url), "utf8");
+
+  assert.match(detailsSource, /import.*normalizeEquipmentState.*from.*equipment-state/);
+  assert.match(detailsSource, /normalizeEquipmentState\(/);
+  assert.match(detailsSource, /operacao_atual/);
+  assert.match(detailsSource, /ultima_operacao_conhecida/);
+  assert.match(detailsSource, /status_resumo/);
+});
+
+test("api.ts EquipmentDetails interface includes normalized fields", () => {
+  assert.match(apiSource, /operacao_atual:\s*string\s*\|\s*null/);
+  assert.match(apiSource, /ultima_operacao_conhecida:\s*string\s*\|\s*null/);
+  assert.match(apiSource, /status_resumo:\s*string\s*\|\s*null/);
+});
+
+test("equipment status route applies normalizeEquipmentState", () => {
+  const routeSource = readFileSync(new URL("../src/app/api/equipamentos/status/route.ts", import.meta.url), "utf8");
+
+  assert.match(routeSource, /import.*normalizeEquipmentState.*from.*equipment-state/);
+  assert.match(routeSource, /normalizeEquipmentState\(/);
+  assert.match(routeSource, /operacao_atual/);
+  assert.match(routeSource, /ultima_operacao_conhecida/);
+  assert.match(routeSource, /status_resumo/);
+});
+
+test("drawer shows separated blocks for presence, operational state and last operation", () => {
+  const drawerSource = readFileSync(new URL("../src/components/EquipmentDetailsDrawer.tsx", import.meta.url), "utf8");
+
+  assert.match(drawerSource, /Presença técnica/);
+  assert.match(drawerSource, /Estado operacional/);
+  assert.match(drawerSource, /Última operação conhecida/);
+  assert.match(drawerSource, /status_resumo/);
+  assert.match(drawerSource, /operacao_atual/);
+  assert.match(drawerSource, /ultima_operacao_conhecida/);
+  assert.match(drawerSource, /Ver rastro/);
+  assert.match(drawerSource, /Ver eventos/);
+  assert.match(drawerSource, /Ver opera/);
+  assert.match(drawerSource, /Tentar novamente/);
+});
+
+test("roadmap includes 3.4M as completed", () => {
+  const roadmapSource = readFileSync(new URL("../docs/specs/roadmap.md", import.meta.url), "utf8");
+
+  assert.match(roadmapSource, /3\.4M normalizar presen/);
+});

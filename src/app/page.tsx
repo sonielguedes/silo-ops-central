@@ -386,10 +386,10 @@ export default function DashboardPage() {
                 {s.opsErr && <ErrorState label="/api/operacoes/ativas" msg={s.opsErr} />}
                 {!s.opsErr && s.ops.length === 0 ? (
                   <EmptyState title="Nenhuma operação ativa no momento" sub="Aguardando o início da jornada operacional ou sincronização dos APKs." />
-                ) : s.ops.map(op => {
+                ) : s.ops.map((op, idx) => {
                   const isSelected = op.status?.toUpperCase().includes("PAUS") ? "warn" : op.status?.toUpperCase().includes("ATIV") ? "good" : "neutral";
                   return (
-                    <div key={op.operacao_id} className="rounded-2xl border border-[#1f334d] bg-[#101b2d]/60 p-4 space-y-3">
+                    <div key={op.operacao_id ?? `${op.trator_id}-${op.inicio ?? idx}`} className="rounded-2xl border border-[#1f334d] bg-[#101b2d]/60 p-4 space-y-3">
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <p className="text-[#00d4ff] font-black text-sm">{op.trator_id}</p>
