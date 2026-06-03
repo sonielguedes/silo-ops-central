@@ -265,11 +265,16 @@ export default function EquipmentRegistryModal({
             <div className="grid gap-4 lg:grid-cols-2">
               <Section title="Cadastro operacional">
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <Field label="Frota / Cod. Operacional" value={form.frota} onChange={(value) => setForm((prev) => ({ ...prev, frota: value }))} />
-                  <Field label="ID Tecnico (Ex: T01)" value={form.trator_id} onChange={(value) => setForm((prev) => ({ ...prev, trator_id: value }))} disabled={lockId} />
+                  <Field label="Código/Frota" value={form.frota} onChange={(value) => setForm((prev) => ({ ...prev, frota: value }))} />
                   <div className="sm:col-span-2">
                     <Field label="Descrição" value={form.nome} onChange={(value) => setForm((prev) => ({ ...prev, nome: value }))} />
                   </div>
+                  {/* trator_id remains technical and hidden in the main form if it's already set */}
+                  {mode === "create" && !row?.id && (
+                    <div className="sm:col-span-2 opacity-50">
+                      <Field label="ID Técnico (Telemetria)" value={form.trator_id} onChange={(value) => setForm((prev) => ({ ...prev, trator_id: value }))} />
+                    </div>
+                  )}
                   <Field label="Tipo" value={form.tipo_equipamento} options={classificationOptions?.tipos} onChange={(value) => setForm((prev) => ({ ...prev, tipo_equipamento: value }))} />
                   <Field label="Modelo" value={form.modelo} options={classificationOptions?.modelos} onChange={(value) => setForm((prev) => ({ ...prev, modelo: value }))} />
                   <Field label="Grupo" value={form.grupo} options={classificationOptions?.grupos} onChange={(value) => setForm((prev) => ({ ...prev, grupo: value }))} />

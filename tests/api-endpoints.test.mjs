@@ -194,7 +194,7 @@ test("equipment list exposes direct trail navigation on each row", () => {
   const equipmentsSource = readFileSync(new URL("../src/app/equipamentos/page.tsx", import.meta.url), "utf8");
   const trailIndexSource = readFileSync(new URL("../src/app/equipamentos/rastro/page.tsx", import.meta.url), "utf8");
 
-  assert.match(equipmentsSource, /Ver Rastro/);
+  assert.match(equipmentsSource, /Rastro/);
   assert.match(equipmentsSource, /\/equipamentos\/\$\{row\.id\}\/rastro/);
   assert.match(equipmentsSource, /EquipmentRegistryModal/);
   assert.match(equipmentsSource, /mergeEquipments/);

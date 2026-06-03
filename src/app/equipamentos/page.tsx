@@ -442,48 +442,42 @@ export default function EquipamentosPage() {
               <table className="w-full min-w-[1180px] text-sm">
                 <thead>
                   <tr className="bg-[#111820] text-left text-xs uppercase tracking-wider text-[#4a6a8a] border-b border-[#1e2d3d]">
-                    <th className="px-4 py-3">Equipamento</th>
+                    <th className="px-4 py-3">Código/Frota</th>
+                    <th className="px-4 py-3">Descrição</th>
+                    <th className="px-4 py-3">Modelo</th>
                     <th className="px-4 py-3">Tipo</th>
+                    <th className="px-4 py-3">Grupo</th>
                     <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3">Cadastro</th>
-                    <th className="px-4 py-3">Telemetria</th>
-                    <th className="px-4 py-3">Ultimo sinal</th>
-                    <th className="px-4 py-3">Bateria / GPS</th>
-                    <th className="px-4 py-3">Acoes</th>
+                    <th className="px-4 py-3 text-right">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#1e2d3d]/50 bg-[#161f2a]">
                   {filtered.map((row) => (
                     <tr key={row.id} className="align-top hover:bg-[#1e2d3d]/30">
                       <td className="px-4 py-4">
-                        <div className="font-semibold text-[#dce8f5]">{row.frota ? `${row.frota} — ${row.displayName}` : row.displayName}</div>
-                        <div className="mt-1 font-mono text-[10px] uppercase tracking-widest text-[#4a6a8a]">ID Tecnico: {row.id}</div>
-                        <div className="mt-1 text-[11px] text-[#4a6a8a]">{row.model || "Sem modelo"}{row.group ? ` - ${row.group}` : ""}</div>
+                        <div className="font-bold text-[#00d4ff] font-mono">{row.frota || row.id}</div>
+                        <div className="mt-1 text-[10px] text-[#4a6a8a] uppercase tracking-tighter">ID: {row.id}</div>
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="font-medium text-[#dce8f5]">{row.displayName || "--"}</div>
+                      </td>
+                      <td className="px-4 py-4 text-[#c8d8e8]">
+                        {row.model || "--"}
                       </td>
                       <td className="px-4 py-4">
                         <Badge label={row.typeLabel} variant="info" dot={false} />
                       </td>
+                      <td className="px-4 py-4 text-[#c8d8e8]">
+                        {row.group || "--"}
+                      </td>
                       <td className="px-4 py-4">
                         <Badge label={row.statusLabel} variant={statusTone(row.statusKey)} dot={false} />
-                      </td>
-                      <td className="px-4 py-4">
-                        <Badge label={row.isRegistered ? "Cadastrado" : "Nao cadastrado"} variant={row.isRegistered ? "online" : "pendente"} dot={false} />
-                      </td>
-                      <td className="px-4 py-4">
-                        <Badge label={row.telemetryLabel} variant={telemetryTone(row)} dot={false} />
-                        <div className="mt-2 text-[11px] text-[#4a6a8a]">
-                          {row.hasTelemetry ? `Presenca ${row.presenceLabel} - ${row.live?.status || "Sem status live"}` : "Sem feed live"}
+                        <div className="mt-2 text-[10px] text-[#4a6a8a] uppercase font-bold">
+                          {row.hasTelemetry ? `Live: ${row.presenceLabel}` : "Sem feed"}
                         </div>
                       </td>
-                      <td className="px-4 py-4 text-xs text-[#4a6a8a]">{row.lastSeen ? timeAgo(row.lastSeen) : "--"}</td>
-                      <td className="px-4 py-4">
-                        <div className="space-y-2 text-xs text-[#4a6a8a]">
-                          <div>{row.battery === null || row.battery === undefined ? "--" : `${row.battery}%`}</div>
-                          <div>{row.latitude !== null && row.longitude !== null ? `${row.latitude.toFixed(4)}, ${row.longitude.toFixed(4)}` : "--"}</div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="flex flex-wrap gap-2">
+                      <td className="px-4 py-4 text-right">
+                        <div className="flex flex-wrap gap-2 justify-end">
                           <button type="button" className="btn-ghost !px-3 !py-2 text-xs" onClick={() => openDetails(row)}>
                             Detalhes
                           </button>
@@ -495,11 +489,11 @@ export default function EquipamentosPage() {
                               disabled={!masterAvailable}
                               title={!masterAvailable ? "Cadastro mestre indisponivel" : undefined}
                             >
-                              {row.isRegistered ? "Editar" : "Cadastrar"}
+                              Editar
                             </button>
                           )}
                           <Link href={`/equipamentos/${row.id}/rastro`} className="btn-primary !px-3 !py-2 text-xs inline-flex items-center">
-                            Ver Rastro
+                            Rastro
                           </Link>
                         </div>
                       </td>
