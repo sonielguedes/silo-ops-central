@@ -75,6 +75,7 @@ export default function MapaClient() {
     };
   }, [selectedId, showRastro, rastroLimit]);
 
+  const isDrawerOpen = Boolean(selectedId);
   const equipamentoComCoordenadas = useMemo(() => equip.map((eq) => ({ eq, coord: resolveEquipmentCoordinates(eq as unknown as Record<string, unknown>) })), [equip]);
   const comGPS = equipamentoComCoordenadas.filter((item) => item.coord.hasCoordinates).map((item) => item.eq);
   const semGPS = equipamentoComCoordenadas.filter((item) => !item.coord.hasCoordinates);
@@ -112,41 +113,47 @@ export default function MapaClient() {
           ))}
         </div>
 
-        <div className="flex flex-col lg:flex-row gap-6 flex-1 min-h-[520px] pb-2 overflow-hidden">
-          <div className="flex-1 relative border border-[#1e2d3d] rounded-2xl overflow-hidden bg-[#090e14] min-h-[520px]">
-            <MapComponent
-              equipamentosComGPS={comGPS}
-              visualConfigs={visualConfigs}
-              selectedId={selectedId}
-              rastro={rastro}
-              onSelect={(eq) => setSelectedId((prev) => (prev === eq.trator_id ? null : eq.trator_id))}
-              onDeselect={() => setSelectedId(null)}
-            />
+        <div className="flex flex-col gap-6 flex-1 min-h-[520px] pb-2 overflow-hidden">
+          <div className={`grid gap-6 flex-1 min-h-[520px] ${isDrawerOpen ? "xl:grid-cols-[minmax(0,1fr)_440px]" : "xl:grid-cols-1"}`}>
+            <div className="relative min-w-0 border border-[#1e2d3d] rounded-2xl overflow-hidden bg-[#090e14] min-h-[520px]">
+              <MapComponent
+                equipamentosComGPS={comGPS}
+                visualConfigs={visualConfigs}
+                selectedId={selectedId}
+                drawerOpen={isDrawerOpen}
+                rastro={rastro}
+                onSelect={(eq) => setSelectedId((prev) => (prev === eq.trator_id ? null : eq.trator_id))}
+                onDeselect={() => setSelectedId(null)}
+              />
+            </div>
+
+            <EquipmentDetailsDrawer tratorId={selectedId} open={Boolean(selectedId)} onClose={() => setSelectedId(null)} />
           </div>
 
-          <div className="lg:w-80 flex flex-col gap-4">
-            <button className="btn-primary" onClick={() => setShowRastro((v) => !v)}>{showRastro ? "Ocultar rastro" : "Exibir rastro"}</button>
-            <div className="card-p space-y-3">
-              <h3 className="text-white font-bold">Com coordenadas</h3>
-              {filteredComGPS.length > 0 ? filteredComGPS.map((eq) => (
-                <button
-                  key={eq.trator_id}
-                  onClick={() => setSelectedId((prev) => (prev === eq.trator_id ? null : eq.trator_id))}
-                  className="w-full flex items-center justify-between gap-2 text-xs rounded-lg px-2 py-2 hover:bg-[#1e2d3d]/30 transition-colors text-left"
-                >
-                  <span className="text-[#c8d8e8] font-semibold">{eq.trator_id}</span>
-                  <span className={`px-2 py-0.5 rounded border font-bold uppercase ${resolvedPresence(eq) === "ONLINE" ? "text-[#00e676] border-[#00e676]/30" : resolvedPresence(eq) === "INSTAVEL" ? "text-[#ffab00] border-[#ffab00]/30" : resolvedPresence(eq) === "OFFLINE" ? "text-[#ff3d57] border-[#ff3d57]/30" : "text-[#6b7280] border-[#6b7280]/30"}`}>
-                    {resolvedPresence(eq)}
-                  </span>
-                </button>
-              )) : <div className="text-xs text-[#4a6a8a]">Nenhum equipamento com coordenadas filtrado.</div>}
+          <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
+            <div className="flex flex-col gap-4">
+              <button className="btn-primary" onClick={() => setShowRastro((v) => !v)}>{showRastro ? "Ocultar rastro" : "Exibir rastro"}</button>
+              <div className="card-p space-y-3">
+                <h3 className="text-white font-bold">Com coordenadas</h3>
+                {filteredComGPS.length > 0 ? filteredComGPS.map((eq) => (
+                  <button
+                    key={eq.trator_id}
+                    onClick={() => setSelectedId((prev) => (prev === eq.trator_id ? null : eq.trator_id))}
+                    className="w-full flex items-center justify-between gap-2 text-xs rounded-lg px-2 py-2 hover:bg-[#1e2d3d]/30 transition-colors text-left"
+                  >
+                    <span className="text-[#c8d8e8] font-semibold">{eq.trator_id}</span>
+                    <span className={`px-2 py-0.5 rounded border font-bold uppercase ${resolvedPresence(eq) === "ONLINE" ? "text-[#00e676] border-[#00e676]/30" : resolvedPresence(eq) === "INSTAVEL" ? "text-[#ffab00] border-[#ffab00]/30" : resolvedPresence(eq) === "OFFLINE" ? "text-[#ff3d57] border-[#ff3d57]/30" : "text-[#6b7280] border-[#6b7280]/30"}`}>
+                      {resolvedPresence(eq)}
+                    </span>
+                  </button>
+                )) : <div className="text-xs text-[#4a6a8a]">Nenhum equipamento com coordenadas filtrado.</div>}
+              </div>
             </div>
+
             {filteredSemGPS.length > 0 ? <div className="card-p space-y-2"><h3 className="text-white font-bold">Sem coordenadas</h3>{filteredSemGPS.map((item) => <div key={item.eq.trator_id} className="text-xs text-[#4a6a8a]">{item.eq.trator_id} - {item.coord.reason}</div>)}</div> : <Empty title="Nenhum equipamento sem GPS" sub="Todos os equipamentos visiveis possuem coordenadas validas." />}
           </div>
         </div>
       </main>
-
-      <EquipmentDetailsDrawer tratorId={selectedId} open={Boolean(selectedId)} onClose={() => setSelectedId(null)} />
     </div>
   );
 }

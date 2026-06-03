@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { getOperationalPresenceInfo, resolveEquipmentCoordinates, type EquipmentCoordinateInfo, type Equipamento, type GpsPoint } from "@/lib/api";
@@ -9,6 +9,7 @@ import { VisualConfig } from "@/lib/equipment-visual-store";
 interface MapComponentProps {
   equipamentosComGPS: Equipamento[];
   selectedId: string | null;
+  drawerOpen?: boolean;
   rastro?: GpsPoint[];
   visualConfigs?: VisualConfig[];
   onSelect: (eq: Equipamento) => void;
@@ -18,6 +19,7 @@ interface MapComponentProps {
 export default function MapComponent({
   equipamentosComGPS,
   selectedId,
+  drawerOpen = false,
   rastro = [],
   visualConfigs = [],
   onSelect,
@@ -33,6 +35,11 @@ export default function MapComponent({
   const hasFittedRef = useRef(false);
   const [mapType, setMapType] = useState<"dark" | "satellite">("satellite");
   const [zoomLevel, setZoomLevel] = useState(13);
+  const validPoints = useMemo(() => equipamentosComGPS
+    .map((eq) => ({ eq, coords: resolveEquipmentCoordinates(eq as unknown as Record<string, unknown>) }))
+    .filter((item): item is { eq: Equipamento; coords: EquipmentCoordinateInfo & { latitude: number; longitude: number } } =>
+      item.coords.hasCoordinates && item.coords.latitude !== null && item.coords.longitude !== null
+    ), [equipamentosComGPS]);
 
   // 1. Inicia o Mapa
   useEffect(() => {
@@ -59,13 +66,16 @@ export default function MapComponent({
     map.on("zoomend", () => setZoomLevel(map.getZoom()));
 
     const resizeObserver = new ResizeObserver(() => {
-      if (mapRef.current) mapRef.current.invalidateSize();
+      if (mapRef.current && (mapRef.current as L.Map & { _loaded?: boolean })._loaded) mapRef.current.invalidateSize();
     });
     if (mapContainerRef.current) resizeObserver.observe(mapContainerRef.current);
 
-    setTimeout(() => map.invalidateSize(), 500);
+    const initialResize = window.setTimeout(() => {
+      if ((map as L.Map & { _loaded?: boolean })._loaded) map.invalidateSize();
+    }, 500);
 
     return () => {
+      window.clearTimeout(initialResize);
       resizeObserver.disconnect();
       if (mapRef.current) {
         mapRef.current.remove();
@@ -216,12 +226,6 @@ export default function MapComponent({
     const map = mapRef.current;
     if (!map) return;
 
-    const validPoints = equipamentosComGPS
-      .map(eq => ({ eq, coords: resolveEquipmentCoordinates(eq as unknown as Record<string, unknown>) }))
-      .filter((item): item is { eq: Equipamento; coords: EquipmentCoordinateInfo & { latitude: number; longitude: number } } =>
-        item.coords.hasCoordinates && item.coords.latitude !== null && item.coords.longitude !== null
-      );
-
     const currentIds = new Set(validPoints.map(item => item.eq.trator_id));
 
     // Cleanup órfãos
@@ -281,7 +285,24 @@ export default function MapComponent({
             map.fitBounds(bounds, { padding: [100, 100], maxZoom: 17 });
         }
     }
-  }, [equipamentosComGPS, selectedId, createIcon, onSelect]);
+  }, [validPoints, selectedId, createIcon, onSelect]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (!(map as L.Map & { _loaded?: boolean })._loaded) return;
+
+    const selectedPoint = validPoints.find((item) => item.eq.trator_id === selectedId);
+    const timeout = window.setTimeout(() => {
+      map.invalidateSize();
+      if (selectedPoint) {
+        const pos = new L.LatLng(Number(selectedPoint.coords.latitude), Number(selectedPoint.coords.longitude));
+        map.setView(pos, Math.max(map.getZoom(), 18), { animate: true });
+      }
+    }, drawerOpen ? 340 : 80);
+
+    return () => window.clearTimeout(timeout);
+  }, [drawerOpen, selectedId, validPoints]);
 
   // 5. Rastro
   useEffect(() => {

@@ -201,10 +201,19 @@ test("map uses configurable equipment icons and menu exposes icon configuration"
 
 test("map page only renders markers for valid coordinates and lists the reason for missing GPS", () => {
   const mapaSource = readFileSync(new URL("../src/app/mapa/MapaClient.tsx", import.meta.url), "utf8");
+  const mapComponentSource = readFileSync(new URL("../src/components/MapComponent.tsx", import.meta.url), "utf8");
+  const drawerSource = readFileSync(new URL("../src/components/EquipmentDetailsDrawer.tsx", import.meta.url), "utf8");
 
   assert.match(mapaSource, /resolveEquipmentCoordinates/);
   assert.match(mapaSource, /coord\.hasCoordinates/);
   assert.match(mapaSource, /coord\.reason/);
+  assert.match(mapaSource, /xl:grid-cols-\[minmax\(0,1fr\)_440px\]/);
+  assert.match(mapaSource, /drawerOpen=\{isDrawerOpen\}/);
+  assert.match(mapComponentSource, /drawerOpen\?: boolean/);
+  assert.match(mapComponentSource, /invalidateSize/);
+  assert.match(mapComponentSource, /setView\(pos, Math\.max\(map\.getZoom\(\), 18\)/);
+  assert.match(drawerSource, /fixed inset-x-0 bottom-0/);
+  assert.match(drawerSource, /xl:static xl:inset-auto/);
 });
 
 test("equipment list exposes direct trail navigation on each row", () => {

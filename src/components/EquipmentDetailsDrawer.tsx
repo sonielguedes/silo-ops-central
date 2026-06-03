@@ -110,7 +110,7 @@ export default function EquipmentDetailsDrawer({ tratorId, open, onClose }: Prop
   if (!open || !tratorId) return null;
 
   return (
-    <aside className="fixed right-0 top-20 z-50 h-[calc(100vh-5rem)] w-full max-w-[440px] border-l border-[#1f334d] bg-[#0a1018]/96 shadow-[0_30px_80px_rgba(0,0,0,0.6)] backdrop-blur-xl">
+    <aside className="fixed inset-x-0 bottom-0 top-auto z-50 h-[78vh] max-h-[760px] w-full max-w-none overflow-hidden rounded-t-[28px] border border-[#1f334d] border-b-0 bg-[#0a1018]/96 shadow-[0_-16px_60px_rgba(0,0,0,0.55)] backdrop-blur-xl xl:static xl:inset-auto xl:h-full xl:max-h-none xl:w-full xl:max-w-[440px] xl:rounded-2xl xl:border-l xl:border-t xl:border-b xl:shadow-[0_30px_80px_rgba(0,0,0,0.6)]">
       <div className="flex h-full flex-col">
         <div className="flex items-start justify-between gap-4 border-b border-[#1f334d] px-5 py-4">
           <div className="flex items-center gap-3">
