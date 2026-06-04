@@ -256,6 +256,21 @@ test("equipment trail store derives operational state and stop metadata from raw
     assert.equal(stopped?.evento_status, "PARADA");
     assert.equal(stopped?.motivo_status, "Abastecimento");
 
+    const explicitStatus = mod.buildTrailPointFromRecord({
+      trator_id: "T01",
+      timestamp: "2026-06-02T10:10:30.000Z",
+      latitude: -10.15,
+      longitude: -50.25,
+      velocidade: 0.0,
+      status_operacional: "PARADO",
+      origem: "mobile",
+      empresa_id: "SILOOPS",
+      usina_id: "USINA_PADRAO",
+      unidade_id: "UNIDADE_PADRAO",
+    }, "T01", "mobile");
+
+    assert.equal(explicitStatus?.estado_operacional, "PARADO");
+
     const moving = mod.buildTrailPointFromRecord({
       trator_id: "T01",
       timestamp: "2026-06-02T10:11:00.000Z",

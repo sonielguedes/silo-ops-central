@@ -5,6 +5,7 @@ import type { SessionPayload } from "@/lib/auth";
 
 export type TrailPoint = {
   trator_id: string;
+  status_operacional?: string | null;
   timestamp: string;
   latitude: number;
   longitude: number;
@@ -112,8 +113,14 @@ function normalizePoint(point: Partial<TrailPoint>): TrailPoint | null {
   const longitude = Number(point.longitude);
   const timestampMs = parseMs(point.timestamp);
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || timestampMs === null) return null;
+  const estadoOperacional = typeof point.estado_operacional === "string" && point.estado_operacional.trim()
+    ? point.estado_operacional.trim()
+    : typeof point.status_operacional === "string" && point.status_operacional.trim()
+      ? point.status_operacional.trim()
+      : null;
   return {
     trator_id: String(point.trator_id || "").trim(),
+    status_operacional: typeof point.status_operacional === "string" && point.status_operacional.trim() ? point.status_operacional.trim() : estadoOperacional,
     timestamp: new Date(timestampMs).toISOString(),
     latitude,
     longitude,
@@ -123,7 +130,7 @@ function normalizePoint(point: Partial<TrailPoint>): TrailPoint | null {
     empresa_id: scopeValue(point.empresa_id, "SILOOPS"),
     usina_id: scopeValue(point.usina_id, "USINA_PADRAO"),
     unidade_id: scopeValue(point.unidade_id, "UNIDADE_PADRAO"),
-    estado_operacional: textValue(point.estado_operacional) as TrailPoint["estado_operacional"],
+    estado_operacional: textValue(estadoOperacional) as TrailPoint["estado_operacional"],
     codigo_parada: textValue(point.codigo_parada),
     descricao_parada: textValue(point.descricao_parada),
     operacao_id: textValue(point.operacao_id),
@@ -171,7 +178,7 @@ function hasStopSignal(item: Record<string, unknown>, point?: Partial<TrailPoint
 }
 
 function inferOperationalState(item: Record<string, unknown>, point: Partial<TrailPoint>): TrailPoint["estado_operacional"] {
-  const explicit = normalizeOperationalStatus(item.estado_operacional ?? point.estado_operacional);
+  const explicit = normalizeOperationalStatus(item.estado_operacional ?? item.status_operacional ?? point.estado_operacional ?? point.status_operacional);
   if (explicit) return explicit;
 
   const velocidade = Number(point.velocidade ?? item.velocidade ?? item.speed ?? 0);

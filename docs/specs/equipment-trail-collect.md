@@ -11,12 +11,14 @@ Coletar pontos GPS do status operacional e persistir no historico local de rastr
 
 ## Contrato tecnico
 - `POST /api/equipamentos/trail/collect`
-- Autenticacao por `x-collector-token` quando o header existe.
-- Fallback por `sil_session` com `ADMIN_GLOBAL` quando o header nao existe.
+- Autenticacao por `sil_session` com `ADMIN_GLOBAL` ou `X-SILO-MOBILE-TOKEN`.
+- `x-collector-token` segue aceito por compatibilidade com cron legado.
+- `X-SILO-MOBILE-TOKEN` usa `MOBILE_INGEST_TOKEN`.
 - `VIEWER` continua bloqueado com `403`.
-- O coletor busca o status internamente, persiste os pontos validos e retorna o delta coletado.
-- Sucesso responde `{ collected, source_points, upstream_status }`.
-- Em falha real, a rota retorna `500` com `collector_failed`.
+- O APK envia o trail diretamente com `trator_id`, `frota`, `status_operacional`, tenant e coordenadas.
+- A rota valida `trator_id + frota` contra o master e usa `empresa_id/usina_id/unidade_id` do master.
+- Sucesso responde `{ collected, source_points, upstream_status, auth }`.
+- Em falha real, a rota retorna `400`, `401`, `403` ou `500` conforme o erro.
 
 ## Seguranca
 - Sem cookie e sem token: `401 { "error": "unauthorized" }`
@@ -32,7 +34,9 @@ curl -b admin.cookie -X POST http://localhost:3000/api/equipamentos/trail/collec
 
 ```bash
 curl -X POST http://localhost:3000/api/equipamentos/trail/collect \
-  -H "x-collector-token: $COLLECTOR_TOKEN"
+  -H "X-SILO-MOBILE-TOKEN: $MOBILE_INGEST_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"trator_id":"T01","frota":"14002","status_operacional":"TRABALHANDO","latitude":-20.123,"longitude":-47.123,"timestamp":"2026-06-03T12:00:00Z"}'
 ```
 
 ```cron

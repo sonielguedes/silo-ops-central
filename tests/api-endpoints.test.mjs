@@ -136,25 +136,34 @@ test("/api/operacoes/ativas requires session and returns unauthorized JSON", () 
   assert.doesNotMatch(routeSource, /message:\s*"Sessão inválida ou ausente\."|message:\s*"SessÃ£o invÃ¡lida ou ausente\."/);
 });
 
-test("/api/equipamentos/trail/collect is admin protected and persists trail points", () => {
+test("/api/equipamentos/trail/collect accepts admin session or mobile token and persists trail points", () => {
   const routePath = new URL("../src/app/api/equipamentos/trail/collect/route.ts", import.meta.url);
   const routeSource = readFileSync(routePath, "utf8");
   const docSource = readFileSync(new URL("../docs/specs/equipment-trail-collect.md", import.meta.url), "utf8");
+  const envSource = readFileSync(new URL("../.env.production.example", import.meta.url), "utf8");
 
   assert.match(routeSource, /POST/);
   assert.match(routeSource, /getSessionFromRequest/);
   assert.match(routeSource, /isAdminGlobal/);
+  assert.match(routeSource, /x-silo-mobile-token/);
+  assert.match(routeSource, /MOBILE_INGEST_TOKEN/);
   assert.match(routeSource, /x-collector-token/);
   assert.match(routeSource, /COLLECTOR_TOKEN/);
-  assert.match(routeSource, /fetchEquipmentStatusSnapshot/);
+  assert.match(routeSource, /findEquipmentMasterRecordByFrota/);
+  assert.match(routeSource, /normalizeFrotaCode/);
+  assert.match(routeSource, /status_operacional/);
   assert.match(routeSource, /persistTrailPointsFromEquipmentStatus/);
   assert.match(routeSource, /readEquipmentTrailStore/);
   assert.match(routeSource, /collected/);
   assert.match(routeSource, /collector_failed/);
+  assert.match(routeSource, /bad_request/);
   assert.match(routeSource, /401/);
   assert.match(routeSource, /403/);
   assert.match(routeSource, /500/);
+  assert.match(docSource, /X-SILO-MOBILE-TOKEN/);
+  assert.match(docSource, /MOBILE_INGEST_TOKEN/);
   assert.match(docSource, /x-collector-token/);
+  assert.match(envSource, /MOBILE_INGEST_TOKEN=trocar-em-producao/);
   assert.match(docSource, /curl -b admin\.cookie -X POST \/api\/equipamentos\/trail\/collect/);
   assert.equal(existsSync(routePath), true);
 });
@@ -684,6 +693,7 @@ test("equipment status route applies normalizeEquipmentState", () => {
   assert.match(routeSource, /operacao_atual/);
   assert.match(routeSource, /ultima_operacao_conhecida/);
   assert.match(routeSource, /status_resumo/);
+  assert.match(routeSource, /status_operacional/);
 });
 
 test("drawer shows separated blocks for presence, operational state and last operation", () => {

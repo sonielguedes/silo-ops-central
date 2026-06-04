@@ -29,6 +29,7 @@ export interface Equipamento {
   usina_id?: string | null;
   unidade_id?: string | null;
   estado_operacional?: string | null;
+  status_operacional?: string | null;
   operacao_id?: string | null;
   operacao_nome?: string | null;
   descricao_operacao?: string | null;
@@ -95,6 +96,7 @@ export interface EquipmentDetails {
   presence: string | null;
   status: string | null;
   estado_operacional: string | null;
+  status_operacional: string | null;
   operacao_id: string | null;
   operacao_nome: string | null;
   descricao_operacao: string | null;

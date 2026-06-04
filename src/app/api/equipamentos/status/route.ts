@@ -80,6 +80,7 @@ export async function GET(req: NextRequest) {
         status_resumo: state.status_resumo,
         codigo_parada: state.codigo_parada,
         descricao_parada: state.descricao_parada,
+        status_operacional: state.estado_operacional,
         master: Boolean(master),
         cadastro_status: master ? "CADASTRADO" : (merged as any).cadastro_status || "NAO_CADASTRADO",
       };
@@ -142,6 +143,7 @@ export async function GET(req: NextRequest) {
           status_resumo: state.status_resumo,
           codigo_parada: state.codigo_parada,
           descricao_parada: state.descricao_parada,
+          status_operacional: state.estado_operacional,
           master: true,
           tem_telemetria: false,
           cadastro_status: "CADASTRADO",

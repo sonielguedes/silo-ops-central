@@ -19,6 +19,7 @@ export type EquipmentDetails = {
   presence: string | null;
   status: string | null;
   estado_operacional: string | null;
+  status_operacional?: string | null;
   operacao_id: string | null;
   operacao_nome: string | null;
   descricao_operacao: string | null;
