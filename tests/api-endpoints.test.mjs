@@ -231,8 +231,8 @@ test("map page only renders markers for valid coordinates and lists the reason f
   assert.match(drawerSource, /xl:static xl:inset-auto/);
   assert.match(drawerSource, /Com telemetria|Sem telemetria/);
   assert.match(statusRouteSource, /coord_reason:\s*"missing"/);
-  assert.match(statusRouteSource, /tem_telemetria:\s*false/);
-  assert.match(statusRouteSource, /cadastro_status:\s*"CADASTRADO"/);
+  assert.match(statusRouteSource, /tem_telemetria:\s*Boolean\(merged\.tem_telemetria\s*\?\?\s*trailPoint\s*\?\?\s*master\)/);
+  assert.match(statusRouteSource, /master \?\s*"CADASTRADO"\s*:\s*\(merged as any\)\.cadastro_status \|\| "NAO_CADASTRADO"/);
   assert.match(detailsSource, /tem_telemetria/);
   assert.doesNotMatch(statusRouteSource, /SEM_TELEMETRIA/);
 });
@@ -690,6 +690,8 @@ test("equipment status route applies normalizeEquipmentState", () => {
 
   assert.match(routeSource, /import.*normalizeEquipmentState.*from.*equipment-state/);
   assert.match(routeSource, /normalizeEquipmentState\(/);
+  assert.match(routeSource, /readEquipmentTrailStore/);
+  assert.match(routeSource, /mergeStatusItemWithTrailPoint/);
   assert.match(routeSource, /operacao_atual/);
   assert.match(routeSource, /ultima_operacao_conhecida/);
   assert.match(routeSource, /status_resumo/);

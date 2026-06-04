@@ -319,3 +319,82 @@ test("equipment trail store derives operational state and stop metadata from raw
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("equipment trail store exposes latest-point merge for status snapshots", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "silo-trail-store-"));
+  const storePath = join(dir, "equipment-trail.json");
+
+  try {
+    const mod = await loadStoreModule(storePath);
+
+    assert.equal(typeof mod.selectLatestTrailPointForTractor, "function");
+    assert.equal(typeof mod.mergeStatusItemWithTrailPoint, "function");
+
+    await mod.appendEquipmentTrailPoints([
+      {
+        trator_id: "T01",
+        timestamp: "2026-06-03T23:40:00.000Z",
+        latitude: 37.421998,
+        longitude: -122.084,
+        velocidade: 0,
+        status: "ONLINE",
+        origem: "status",
+        empresa_id: "SILOOPS",
+        usina_id: "USINA_PADRAO",
+        unidade_id: "UNIDADE_PADRAO",
+        status_operacional: "SEM_OPERACAO",
+      },
+      {
+        trator_id: "T01",
+        timestamp: "2026-06-03T23:50:00.000Z",
+        latitude: -17.552,
+        longitude: -52.552,
+        velocidade: 0,
+        status: "ONLINE",
+        origem: "mobile-ingest",
+        empresa_id: "SILOOPS",
+        usina_id: "USINA_PADRAO",
+        unidade_id: "UNIDADE_PADRAO",
+        status_operacional: "OPERANDO",
+      },
+    ]);
+
+    const store = await mod.readEquipmentTrailStore();
+    const latest = mod.selectLatestTrailPointForTractor(store.points, "T01");
+    assert.equal(latest?.timestamp, "2026-06-03T23:50:00.000Z");
+    assert.equal(latest?.status_operacional, "OPERANDO");
+
+    const merged = mod.mergeStatusItemWithTrailPoint(
+    {
+      trator_id: "T01",
+      frota: "14002",
+      latitude: 37.421998,
+      longitude: -122.084,
+      presence: "OFFLINE",
+      updated_at: "2026-06-03T23:40:00.000Z",
+      last_seen: "2026-06-03T23:40:00.000Z",
+      status_operacional: "SEM_OPERACAO",
+    },
+      latest,
+      {
+        trator_id: "T01",
+        nome: "Trator T01",
+        tipo_equipamento: "TRATOR",
+        modelo: "TR",
+        grupo: "SULCAGEM",
+        perfil: "",
+        frota: "14002",
+        empresa_id: "SILOOPS",
+        usina_id: "USINA_PADRAO",
+        unidade_id: "UNIDADE_PADRAO",
+      },
+    );
+
+    assert.equal(merged.latitude, -17.552);
+    assert.equal(merged.longitude, -52.552);
+    assert.equal(merged.status_operacional, "OPERANDO");
+    assert.equal(merged.coord_reason, "trail");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

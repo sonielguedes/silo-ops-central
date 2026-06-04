@@ -395,3 +395,99 @@ export async function queryEquipmentTrailPoints(query: TrailQuery): Promise<Trai
 export function makeTrailPointId(prefix = "trail") {
   return `${prefix}_${randomUUID().slice(0, 8)}`;
 }
+
+function parseEffectiveTimestamp(value: unknown) {
+  if (typeof value === "string" && value.trim()) {
+    const ms = new Date(value).getTime();
+    return Number.isFinite(ms) ? ms : null;
+  }
+  return null;
+}
+
+function toNumberOrNull(value: unknown) {
+  if (value === null || value === undefined || value === "") return null;
+  const num = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(num) ? num : null;
+}
+
+export function selectLatestTrailPointForTractor(points: TrailPoint[], tratorId: string): TrailPoint | null {
+  const target = String(tratorId || "").trim();
+  if (!target) return null;
+  const candidates = points
+    .filter((point) => point.trator_id === target && parseMs(point.timestamp) !== null)
+    .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+  return candidates.at(-1) || null;
+}
+
+export function mergeStatusItemWithTrailPoint<T extends Record<string, unknown>>(
+  statusItem: T,
+  trailPoint: TrailPoint | null | undefined,
+  master?: { trator_id: string; frota?: string | null; empresa_id?: string; usina_id?: string; unidade_id?: string } | null,
+) {
+  if (!trailPoint) {
+    return {
+      ...statusItem,
+      ...(master ? {
+        trator_id: master.trator_id,
+        frota: typeof statusItem.frota === "string" ? statusItem.frota : master.frota ?? null,
+        empresa_id: master.empresa_id ?? statusItem.empresa_id,
+        usina_id: master.usina_id ?? statusItem.usina_id,
+        unidade_id: master.unidade_id ?? statusItem.unidade_id,
+      } : {}),
+    };
+  }
+
+  const statusTs = parseEffectiveTimestamp(statusItem.timestamp ?? statusItem.updated_at ?? statusItem.last_seen);
+  const trailTs = parseEffectiveTimestamp(trailPoint.timestamp);
+  const trailWins = trailTs !== null && (statusTs === null || trailTs >= statusTs);
+  const mergedTimestamp = trailWins && trailTs !== null
+    ? new Date(trailTs).toISOString()
+    : typeof statusItem.updated_at === "string" && statusItem.updated_at.trim()
+      ? statusItem.updated_at
+      : typeof statusItem.last_seen === "string" && statusItem.last_seen.trim()
+        ? statusItem.last_seen
+        : trailPoint.timestamp;
+  const trailLat = toNumberOrNull(trailPoint.latitude);
+  const trailLng = toNumberOrNull(trailPoint.longitude);
+  const statusLat = toNumberOrNull(statusItem.latitude);
+  const statusLng = toNumberOrNull(statusItem.longitude);
+  const hasTrailCoords = trailLat !== null && trailLng !== null;
+  const hasStatusCoords = statusLat !== null && statusLng !== null;
+  const useTrailCoords = trailWins && hasTrailCoords;
+  const latitude = useTrailCoords ? trailLat : statusLat;
+  const longitude = useTrailCoords ? trailLng : statusLng;
+
+  return {
+    ...statusItem,
+    ...(master ? {
+      trator_id: master.trator_id,
+      frota: typeof statusItem.frota === "string" && statusItem.frota.trim() ? statusItem.frota : master.frota ?? null,
+      empresa_id: master.empresa_id ?? statusItem.empresa_id,
+      usina_id: master.usina_id ?? statusItem.usina_id,
+      unidade_id: master.unidade_id ?? statusItem.unidade_id,
+    } : {}),
+    timestamp: mergedTimestamp,
+    updated_at: mergedTimestamp,
+    last_seen: mergedTimestamp,
+    latitude,
+    longitude,
+    has_coordinates: Boolean(latitude !== null && longitude !== null),
+    coord_source: trailWins && hasTrailCoords ? trailPoint.origem || "trail" : (typeof statusItem.coord_source === "string" ? statusItem.coord_source : null),
+    coord_reason: trailWins && hasTrailCoords ? "trail" : (typeof statusItem.coord_reason === "string" ? statusItem.coord_reason : (hasStatusCoords ? "status" : "missing")),
+    velocidade: trailWins && trailPoint.velocidade !== undefined ? trailPoint.velocidade : statusItem.velocidade ?? null,
+    status_operacional: typeof trailPoint.status_operacional === "string" && trailPoint.status_operacional.trim()
+      ? trailPoint.status_operacional.trim()
+      : typeof statusItem.status_operacional === "string" && statusItem.status_operacional.trim()
+        ? statusItem.status_operacional.trim()
+        : typeof statusItem.estado_operacional === "string" && statusItem.estado_operacional.trim()
+          ? statusItem.estado_operacional.trim()
+          : null,
+    status: typeof trailPoint.status === "string" && trailPoint.status.trim()
+      ? trailPoint.status.trim()
+      : typeof statusItem.status === "string" && statusItem.status.trim()
+        ? statusItem.status.trim()
+        : null,
+    tem_telemetria: true,
+    master: master ? true : Boolean(statusItem.master),
+  };
+}
