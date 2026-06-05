@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { type EquipmentMasterRecord } from "@/lib/equipment-master-store";
 
-export const MOBILE_STORAGE_PATH = (process.env.MOBILE_STORAGE_PATH || "/app/data/mobile-server-storage.json").trim();
+export const SERVER_STORAGE_PATH = (process.env.SERVER_STORAGE_PATH || "/app/data/mobile-server-storage.json").trim();
 
 export interface MobileEquipmentItem {
   id: string;
@@ -23,9 +23,9 @@ async function withWriteQueue<T>(task: () => Promise<T>): Promise<T> {
   return run;
 }
 
-export async function syncMobileEquipment(items: EquipmentMasterRecord[]) {
+export async function syncServerStorage(items: EquipmentMasterRecord[]) {
   return withWriteQueue(async () => {
-    await mkdir(dirname(MOBILE_STORAGE_PATH), { recursive: true });
+    await mkdir(dirname(SERVER_STORAGE_PATH), { recursive: true });
 
     // Simplified list for mobile consumption
     const mobileItems: MobileEquipmentItem[] = items
@@ -41,13 +41,16 @@ export async function syncMobileEquipment(items: EquipmentMasterRecord[]) {
         updated_at: item.updated_at
       }));
 
-    await writeFile(MOBILE_STORAGE_PATH, JSON.stringify(mobileItems, null, 2), "utf8");
+    await writeFile(SERVER_STORAGE_PATH, JSON.stringify(mobileItems, null, 2), "utf8");
   });
 }
 
-export async function readMobileEquipment(): Promise<MobileEquipmentItem[]> {
+/** @deprecated use syncServerStorage */
+export const syncMobileEquipment = syncServerStorage;
+
+export async function readServerStorage(): Promise<MobileEquipmentItem[]> {
   try {
-    const raw = await readFile(MOBILE_STORAGE_PATH, "utf8");
+    const raw = await readFile(SERVER_STORAGE_PATH, "utf8");
     return JSON.parse(raw);
   } catch {
     return [];

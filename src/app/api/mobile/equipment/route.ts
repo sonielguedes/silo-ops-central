@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/auth-server";
 import { readEquipmentMasterStore, upsertEquipmentMaster, type EquipmentMasterInput } from "@/lib/equipment-master-store";
-import { syncMobileEquipment } from "@/lib/mobile-storage";
+import { syncServerStorage } from "@/lib/server-storage";
 
 export const runtime = "nodejs";
 
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
 
     // Sync to mobile storage
     const store = await readEquipmentMasterStore();
-    await syncMobileEquipment(store.items);
+    await syncServerStorage(store.items);
 
     return NextResponse.json(equipamento, { status: 200 });
   } catch (error) {
