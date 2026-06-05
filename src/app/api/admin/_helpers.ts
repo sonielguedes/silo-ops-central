@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionFromRequest, type SessionPayload } from "@/lib/auth";
+import { type SessionPayload } from "@/lib/auth";
+import { getSessionFromRequest } from "@/lib/auth-server";
 import { canViewTenantAdmin, canWriteTenantAdmin } from "@/lib/admin-tenant-store";
 
 export function unauthorized() {
@@ -10,7 +11,7 @@ export function forbidden() {
   return NextResponse.json({ error: "forbidden" }, { status: 403 });
 }
 
-export function requireSession(req: NextRequest): SessionPayload | null {
+export async function requireSession(req: NextRequest): Promise<SessionPayload | null> {
   return getSessionFromRequest(req);
 }
 

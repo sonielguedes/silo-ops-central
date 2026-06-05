@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { buildEquipmentDetails } from "@/lib/equipment-details";
-import { getSessionFromRequest } from "@/lib/auth";
+import { getSessionFromRequest } from "@/lib/auth-server";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ tratorId: string }> }) {
-  const session = getSessionFromRequest(req);
+  const session = await getSessionFromRequest(req);
   if (!session) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }

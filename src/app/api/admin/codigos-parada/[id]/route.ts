@@ -6,7 +6,7 @@ import { filterItemsBySessionScope, isAdminGlobal } from "@/lib/auth";
 export const runtime = "nodejs";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = requireSession(req);
+  const session = await requireSession(req);
   if (!session) return unauthorized();
 
   const { id } = await params;
@@ -22,7 +22,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 }
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = requireSession(req);
+  const session = await requireSession(req);
   if (!session) return unauthorized();
 
   const isAuthorized = isAdminGlobal(session) || session.role === "ADMIN_EMPRESA";

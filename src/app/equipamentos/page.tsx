@@ -102,9 +102,11 @@ function normalizeMasterRecord(item: AdminEquipmentPayload): EquipmentMasterReco
     empresa_id: normalizeText(item.empresa_id) || null,
     usina_id: normalizeText(item.usina_id) || null,
     unidade_id: normalizeText(item.unidade_id) || null,
+    tenant_id: normalizeText(item.tenant_id) || null,
+    mobile_enabled: typeof item.mobile_enabled === "boolean" ? item.mobile_enabled : true,
     frota: normalizeText(item.frota),
     observacao: normalizeText(item.observacao || item.notes || item.descricao) || null,
-  };
+  } as any;
 }
 
 function statusTone(status: string | null): "online" | "offline" | "instavel" | "info" {
@@ -328,6 +330,8 @@ export default function EquipamentosPage() {
         grupo: values.grupo.trim(),
         perfil: values.perfil.trim(),
         status: values.status.trim(),
+        tenant_id: values.tenant_id?.trim(),
+        mobile_enabled: values.mobile_enabled,
       };
       const isEdit = modalMode === "edit";
       const url = isEdit ? `${ADMIN_ENDPOINT}/${encodeURIComponent(id)}` : ADMIN_ENDPOINT;

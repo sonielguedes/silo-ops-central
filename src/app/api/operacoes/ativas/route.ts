@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { IS_DEMO, SITE_URL } from "@/lib/app-env";
-import { filterItemsBySessionScope, getSessionFromRequest, normalizeScopeFields } from "@/lib/auth";
+import { filterItemsBySessionScope, normalizeScopeFields } from "@/lib/auth";
+import { getSessionFromRequest } from "@/lib/auth-server";
 
 const B = (process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000").trim().replace(/\/$/, "");
 
@@ -26,7 +27,7 @@ function normalize(item: any) {
 }
 
 export async function GET(req: NextRequest) {
-  const session = getSessionFromRequest(req);
+  const session = await getSessionFromRequest(req);
   if (!session) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }

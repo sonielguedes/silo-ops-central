@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { IS_DEMO, SITE_URL } from "@/lib/app-env";
 import { normalizeEquipmentList } from "@/lib/api";
-import { filterItemsBySessionScope, getSessionFromRequest, normalizeScopeFields } from "@/lib/auth";
+import { filterItemsBySessionScope, normalizeScopeFields } from "@/lib/auth";
+import { getSessionFromRequest } from "@/lib/auth-server";
 import { fetchEquipmentStatusSnapshot, persistTrailPointsFromEquipmentStatus } from "@/lib/equipment-status-trail";
 import { normalizeEquipmentState } from "@/lib/equipment-state";
 import { enrichEquipmentStatusWithMaster, findEquipmentMasterRecord, readEquipmentMasterStore } from "@/lib/equipment-master-store";
@@ -87,7 +88,7 @@ function finalizeStatusRow<T extends Record<string, unknown>>(
 }
 
 export async function GET(req: NextRequest) {
-  const session = getSessionFromRequest(req);
+  const session = await getSessionFromRequest(req);
   if (!session) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }

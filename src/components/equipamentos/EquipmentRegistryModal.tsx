@@ -59,6 +59,8 @@ export type EquipmentFormValues = {
   grupo: string;
   perfil: string;
   status: string;
+  tenant_id?: string;
+  mobile_enabled?: boolean;
 };
 
 export type EquipmentClassificationOptions = {
@@ -160,6 +162,8 @@ export default function EquipmentRegistryModal({
       grupo: row?.master?.grupo || "",
       perfil: row?.master?.perfil || "",
       status: row?.master?.status || row?.statusLabel || "",
+      tenant_id: (row?.master as any)?.tenant_id || "",
+      mobile_enabled: (row?.master as any)?.mobile_enabled ?? true,
     });
   }, [open, row, mode]);
 
@@ -281,6 +285,21 @@ export default function EquipmentRegistryModal({
                   <Field label="Perfil" value={form.perfil} options={classificationOptions?.perfis} onChange={(value) => setForm((prev) => ({ ...prev, perfil: value }))} />
                   <div className="sm:col-span-2">
                     <Field label="Status" value={form.status} onChange={(value) => setForm((prev) => ({ ...prev, status: value }))} />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Field label="Tenant ID" value={form.tenant_id || ""} onChange={(value) => setForm((prev) => ({ ...prev, tenant_id: value }))} />
+                  </div>
+                  <div className="sm:col-span-2 flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="mobile_enabled"
+                      checked={form.mobile_enabled}
+                      onChange={(ev) => setForm((prev) => ({ ...prev, mobile_enabled: ev.target.checked }))}
+                      className="h-4 w-4 rounded border-[#1f334d] bg-[#0d1420] text-[#00d4ff] focus:ring-[#00d4ff]"
+                    />
+                    <label htmlFor="mobile_enabled" className="text-[10px] font-black uppercase tracking-[0.18em] text-[#4a6a8a]">
+                      Habilitar Mobile
+                    </label>
                   </div>
                 </div>
               </Section>

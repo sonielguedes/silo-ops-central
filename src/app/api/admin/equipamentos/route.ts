@@ -6,6 +6,7 @@ import {
   upsertEquipmentMaster,
   type EquipmentMasterInput,
 } from "@/lib/equipment-master-store";
+import { syncMobileEquipment } from "@/lib/mobile-storage";
 
 export const runtime = "nodejs";
 
@@ -42,11 +43,13 @@ function mapBody(body: Record<string, unknown>): EquipmentMasterInput {
     empresa_id: typeof body.empresa_id === "string" ? body.empresa_id : undefined,
     usina_id: typeof body.usina_id === "string" ? body.usina_id : undefined,
     unidade_id: typeof body.unidade_id === "string" ? body.unidade_id : undefined,
+    tenant_id: typeof body.tenant_id === "string" ? body.tenant_id : undefined,
+    mobile_enabled: typeof body.mobile_enabled === "boolean" ? body.mobile_enabled : undefined,
   };
 }
 
 export async function GET(req: NextRequest) {
-  const session = requireSession(req);
+  const session = await requireSession(req);
   if (!session) return unauthorized();
   if (!canRead(session.role)) return forbidden();
 
@@ -55,7 +58,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = requireSession(req);
+  const session = await requireSession(req);
   if (!session) return unauthorized();
   if (!canWrite(session.role)) return forbidden();
 
@@ -64,6 +67,11 @@ export async function POST(req: NextRequest) {
 
   try {
     const equipamento = await upsertEquipmentMaster(mapBody(body), session);
+
+    // Sync to mobile storage
+    const store = await readEquipmentMasterStore();
+    await syncMobileEquipment(store.items);
+
     return NextResponse.json({ ok: true, equipamento }, { status: 200 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro desconhecido";

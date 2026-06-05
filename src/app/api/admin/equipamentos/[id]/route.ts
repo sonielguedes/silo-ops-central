@@ -9,6 +9,7 @@ import {
   type EquipmentMasterInput,
 } from "@/lib/equipment-master-store";
 import { isAdminGlobal } from "@/lib/auth";
+import { syncMobileEquipment } from "@/lib/mobile-storage";
 
 export const runtime = "nodejs";
 
@@ -54,11 +55,13 @@ function mapBody(body: Record<string, unknown>, id: string, existing?: Equipment
     empresa_id: readTextField(body, "empresa_id") ?? existing?.empresa_id,
     usina_id: readTextField(body, "usina_id") ?? existing?.usina_id,
     unidade_id: readTextField(body, "unidade_id") ?? existing?.unidade_id,
+    tenant_id: readTextField(body, "tenant_id") ?? existing?.tenant_id,
+    mobile_enabled: typeof body.mobile_enabled === "boolean" ? body.mobile_enabled : existing?.mobile_enabled,
   };
 }
 
 export async function GET(req: NextRequest, context: { params: Promise<{ id: string }> }) {
-  const session = requireSession(req);
+  const session = await requireSession(req);
   if (!session) return unauthorized();
   if (!canRead(session.role)) return forbidden();
 
@@ -74,7 +77,7 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
 }
 
 export async function PUT(req: NextRequest, context: { params: Promise<{ id: string }> }) {
-  const session = requireSession(req);
+  const session = await requireSession(req);
   if (!session) return unauthorized();
   if (!canWrite(session.role)) return forbidden();
 
@@ -86,6 +89,11 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
     const store = await readEquipmentMasterStore();
     const existing = getEquipmentMasterById(store.items, id);
     const equipamento = await upsertEquipmentMaster(mapBody(body, existing?.id || id, existing), session);
+
+    // Sync to mobile storage
+    const nextStore = await readEquipmentMasterStore();
+    await syncMobileEquipment(nextStore.items);
+
     return NextResponse.json({ ok: true, equipamento }, { status: 200 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro desconhecido";

@@ -64,6 +64,7 @@ export interface SessionPayload {
   name: string;
   role: Role;
   empresa_id: string;
+  tenant_id: string;
   usinas: string[];
   unidades: string[];
   permissions: string[];
@@ -208,7 +209,7 @@ export function canUseProdLogin(email: string, password: string, adminEmail: str
   return matchesEnv || matchesOfficial;
 }
 
-export function buildSession(email: string, mode: AuthMode): SessionPayload {
+export function buildSession(email: string, mode: AuthMode, tenant_id?: string): SessionPayload {
   const seed = USER_SEEDS.find((user) => user.email === normalizeLoginEmail(email));
   const normalizedEmail = normalizeLoginEmail(email);
   const role = normalizeRole(seed?.role);
@@ -217,6 +218,7 @@ export function buildSession(email: string, mode: AuthMode): SessionPayload {
     name: seed?.name || buildVisualProfile(normalizedEmail, mode).name,
     role,
     empresa_id: seed?.empresa_id || "SILOOPS",
+    tenant_id: tenant_id || "SILOOPS",
     usinas: seed?.usinas || [],
     unidades: seed?.unidades || [],
     permissions: seed?.permissions || DEFAULT_MODULE_PERMISSIONS.dashboard,
@@ -265,10 +267,6 @@ export function filterItemsBySessionScope<T extends ScopedRecord>(items: T[], pr
   });
 }
 
-export function getSessionFromRequest(request: NextRequest): SessionPayload | null {
-  const raw = request.cookies.get(SESSION_COOKIE_NAME)?.value || null;
-  return decodeSessionCookie(raw);
-}
 
 export function getScopeFilter(profile: SessionPayload | null): ScopeFilter | null {
   if (!profile || isAdminGlobal(profile)) return null;
@@ -334,7 +332,7 @@ export function decodeSessionCookie(raw?: string | null): SessionPayload | null 
 
     if (parsed.expiry <= Date.now()) return null;
 
-    const session = buildSession(normalizeLoginEmail(parsed.email), parsed.mode);
+    const session = buildSession(normalizeLoginEmail(parsed.email), parsed.mode, parsed.tenant_id);
     return {
       ...session,
       expiry: parsed.expiry,

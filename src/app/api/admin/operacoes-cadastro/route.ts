@@ -6,7 +6,7 @@ import { filterItemsBySessionScope, isAdminGlobal } from "@/lib/auth";
 export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
-  const session = requireSession(req);
+  const session = await requireSession(req);
   if (!session) return unauthorized();
 
   const store = await readOperationRegistryStore();
@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = requireSession(req);
+  const session = await requireSession(req);
   if (!session) return unauthorized();
 
   const isAuthorized = isAdminGlobal(session) || session.role === "ADMIN_EMPRESA";

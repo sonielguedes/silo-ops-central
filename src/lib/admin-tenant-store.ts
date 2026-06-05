@@ -13,6 +13,8 @@ export interface AdminTenantSessionLike {
 
 export interface AdminTenantEmpresa {
   empresa_id: string;
+  tenant_id: string;
+  mobile_token: string;
   nome_empresa: string;
   status: string;
   created_at: string;
@@ -200,6 +202,8 @@ export async function upsertEmpresa(input: Partial<AdminTenantEmpresa>) {
     const existing = store.empresas.find((item) => item.empresa_id === empresaId);
     const next: AdminTenantEmpresa = {
       empresa_id: empresaId,
+      tenant_id: (input.tenant_id as string || existing?.tenant_id || "SILOOPS").trim(),
+      mobile_token: (input.mobile_token as string || existing?.mobile_token || "").trim(),
       nome_empresa: nomeEmpresa,
       status: normalizeStatus(input.status),
       created_at: existing?.created_at || now,
@@ -209,6 +213,11 @@ export async function upsertEmpresa(input: Partial<AdminTenantEmpresa>) {
     await writeAdminTenantStore({ ...store, empresas });
     return next;
   });
+}
+
+export function getCompanyByToken(store: AdminTenantStore, token: string) {
+  if (!token) return null;
+  return store.empresas.find((item) => item.mobile_token === token && item.status === "ATIVO") || null;
 }
 
 export async function upsertUsina(input: Partial<AdminTenantUsina>) {

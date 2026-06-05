@@ -5,7 +5,7 @@ import { getAccessibleEmpresaIds, readAdminTenantStore, upsertEmpresa } from "@/
 export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
-  const session = requireSession(req);
+  const session = await requireSession(req);
   if (!session) return unauthorized();
   if (!canReadAdminTenant(session)) return forbidden();
 
@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = requireSession(req);
+  const session = await requireSession(req);
   if (!session) return unauthorized();
   if (!canWriteAdminTenant(session)) return forbidden();
 

@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionFromRequest, isAdminGlobal } from "@/lib/auth";
+import { getSessionFromRequest } from "@/lib/auth-server";
+import { isAdminGlobal } from "@/lib/auth";
 import { findEquipmentMasterRecordByFrota, normalizeFrotaCode, readEquipmentMasterStore } from "@/lib/equipment-master-store";
 import { appendEquipmentTrailPoints, buildTrailPointFromRecord, readEquipmentTrailStore } from "@/lib/equipment-trail-store";
 import { fetchEquipmentStatusSnapshot, persistTrailPointsFromEquipmentStatus } from "@/lib/equipment-status-trail";
+
+import { SessionPayload } from "@/lib/auth";
 
 const MOBILE_TOKEN_HEADER = "x-silo-mobile-token";
 const LEGACY_COLLECTOR_TOKEN_HEADER = "x-collector-token";
@@ -41,8 +44,8 @@ function getHeaderToken(req: NextRequest, headerName: string) {
   return (req.headers.get(headerName) || "").trim();
 }
 
-function authorize(req: NextRequest): { ok: true; mode: AuthMode; session: ReturnType<typeof getSessionFromRequest> } | { ok: false; status: 401 | 403 } {
-  const session = getSessionFromRequest(req);
+async function authorize(req: NextRequest): Promise<{ ok: boolean; mode?: AuthMode; session?: SessionPayload | null; status?: number }> {
+  const session = await getSessionFromRequest(req);
   if (session && isAdminGlobal(session)) {
     return { ok: true, mode: "admin-session", session };
   }
@@ -143,7 +146,7 @@ async function ingestSnapshotTrailPoints() {
 }
 
 export async function POST(req: NextRequest) {
-  const auth = authorize(req);
+  const auth = await authorize(req);
   if (!auth.ok) {
     return auth.status === 403 ? forbidden() : unauthorized();
   }

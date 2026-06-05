@@ -32,6 +32,8 @@ export interface EquipmentMasterRecord {
   empresa_id: string;
   usina_id: string;
   unidade_id: string;
+  tenant_id: string;
+  mobile_enabled: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -65,6 +67,8 @@ export interface EquipmentMasterInput {
   empresa_id?: string;
   usina_id?: string;
   unidade_id?: string;
+  tenant_id?: string;
+  mobile_enabled?: boolean | string | number;
 }
 
 export interface EquipmentMasterLookup {
@@ -102,6 +106,8 @@ const SEED_ITEMS: EquipmentMasterRecord[] = [
     empresa_id: "SILOOPS",
     usina_id: "USINA_PADRAO",
     unidade_id: "UNIDADE_PADRAO",
+    tenant_id: "SILOOPS",
+    mobile_enabled: true,
     created_at: "2026-01-01T00:00:00.000Z",
     updated_at: "2026-01-01T00:00:00.000Z",
   },
@@ -129,6 +135,8 @@ const SEED_ITEMS: EquipmentMasterRecord[] = [
     empresa_id: "SILOOPS",
     usina_id: "USINA_PADRAO",
     unidade_id: "UNIDADE_PADRAO",
+    tenant_id: "SILOOPS",
+    mobile_enabled: true,
     created_at: "2026-01-01T00:00:00.000Z",
     updated_at: "2026-01-01T00:00:00.000Z",
   },
@@ -230,6 +238,8 @@ function normalizeRecord(raw: Partial<EquipmentMasterRecord>, fallbackIndex = 0)
     empresa_id: toText(raw.empresa_id, "SILOOPS"),
     usina_id: toText(raw.usina_id, "USINA_PADRAO"),
     unidade_id: toText(raw.unidade_id, "UNIDADE_PADRAO"),
+    tenant_id: toText(raw.tenant_id, "SILOOPS"),
+    mobile_enabled: toBoolean(raw.mobile_enabled, true),
     created_at: normalizeTimestamp(raw.created_at, now),
     updated_at: normalizeTimestamp(raw.updated_at, now),
   };
@@ -359,7 +369,12 @@ export function findEquipmentMasterRecordByFrota(items: EquipmentMasterRecord[],
   const targetFrota = normalizeFrotaCode(frota);
   if (!targetFrota) return null;
   const scoped = listAccessibleEquipmentMaster(items, session || null);
-  return scoped.find((item) => normalizeFrotaCode(item.frota) === targetFrota) || null;
+  return scoped.find((item) => {
+    const frotaMatch = normalizeFrotaCode(item.frota) === targetFrota;
+    if (!frotaMatch) return false;
+    if (session?.tenant_id && item.tenant_id !== session.tenant_id) return false;
+    return true;
+  }) || null;
 }
 
 export function listActiveEquipmentMaster(items: EquipmentMasterRecord[], session?: SessionPayload | null) {
@@ -367,7 +382,12 @@ export function listActiveEquipmentMaster(items: EquipmentMasterRecord[], sessio
 }
 
 export function listMobileEquipmentMaster(items: EquipmentMasterRecord[], session?: SessionPayload | null) {
-  return listAccessibleEquipmentMaster(items, session || null).filter((item) => item.status === "ATIVO" && hasText(item.frota) && hasText(item.tipo_equipamento));
+  return listAccessibleEquipmentMaster(items, session || null).filter((item) => {
+    const base = item.status === "ATIVO" && hasText(item.frota) && hasText(item.tipo_equipamento) && item.mobile_enabled;
+    if (!base) return false;
+    if (session?.tenant_id && item.tenant_id !== session.tenant_id) return false;
+    return true;
+  });
 }
 
 export function enrichEquipmentStatusWithMaster<T extends Record<string, unknown>>(statusItem: T, master: EquipmentMasterRecord | null, hasTelemetry = true) {
@@ -487,6 +507,8 @@ export function normalizeEquipmentMasterInput(input: EquipmentMasterInput, exist
     empresa_id: toText(input.empresa_id, existing?.empresa_id || "SILOOPS"),
     usina_id: toText(input.usina_id, existing?.usina_id || "USINA_PADRAO"),
     unidade_id: toText(input.unidade_id, existing?.unidade_id || "UNIDADE_PADRAO"),
+    tenant_id: toText(input.tenant_id, existing?.tenant_id || "SILOOPS"),
+    mobile_enabled: toBoolean(input.mobile_enabled ?? existing?.mobile_enabled, true),
     created_at: existing?.created_at || now,
     updated_at: now,
   });
@@ -498,7 +520,14 @@ export async function upsertEquipmentMaster(input: EquipmentMasterInput, session
   return withWriteQueue(async () => {
     const store = await readEquipmentMasterStore();
     const existing = getEquipmentMasterById(store.items, toText(input.id, ""));
-    const candidate = normalizeEquipmentMasterInput(input, existing, input.id);
+
+    // Ensure tenant_id is set from session if missing and not global admin
+    const effectiveInput = { ...input };
+    if (!effectiveInput.tenant_id && session && session.tenant_id) {
+      effectiveInput.tenant_id = session.tenant_id;
+    }
+
+    const candidate = normalizeEquipmentMasterInput(effectiveInput, existing, effectiveInput.id);
 
     if (session && !canWriteItem(session, candidate)) {
       throw new Error("fora do escopo do tenant");

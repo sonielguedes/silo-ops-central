@@ -12,7 +12,7 @@ function canWrite(role?: string | null) {
 
 export function createWorkforceListRoute(kind: "cargos" | "equipes" | "operadores") {
   return async function GET(req: NextRequest) {
-    const session = requireSession(req);
+    const session = await requireSession(req);
     if (!session) return unauthorized();
     if (!canRead(session.role)) return forbidden();
     const items = await listWorkforce(kind, session);
@@ -22,7 +22,7 @@ export function createWorkforceListRoute(kind: "cargos" | "equipes" | "operadore
 
 export function createWorkforceCreateRoute(kind: "cargos" | "equipes" | "operadores") {
   return async function POST(req: NextRequest) {
-    const session = requireSession(req);
+    const session = await requireSession(req);
     if (!session) return unauthorized();
     if (!canWrite(session.role)) return forbidden();
     const body = await readJsonBody(req);
@@ -40,7 +40,7 @@ export function createWorkforceCreateRoute(kind: "cargos" | "equipes" | "operado
 
 export function createWorkforceGetRoute(kind: "cargos" | "equipes" | "operadores") {
   return async function GET(req: NextRequest, context: { params: Promise<{ id: string }> }) {
-    const session = requireSession(req);
+    const session = await requireSession(req);
     if (!session) return unauthorized();
     if (!canRead(session.role)) return forbidden();
     const { id } = await context.params;
@@ -52,7 +52,7 @@ export function createWorkforceGetRoute(kind: "cargos" | "equipes" | "operadores
 
 export function createWorkforceUpdateRoute(kind: "cargos" | "equipes" | "operadores") {
   return async function PUT(req: NextRequest, context: { params: Promise<{ id: string }> }) {
-    const session = requireSession(req);
+    const session = await requireSession(req);
     if (!session) return unauthorized();
     if (!canWrite(session.role)) return forbidden();
     const body = await readJsonBody(req);

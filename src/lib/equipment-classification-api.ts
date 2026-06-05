@@ -17,7 +17,7 @@ function canWrite(role?: string | null) {
 
 export function createClassificationListRoute(kind: EquipmentClassificationKind) {
   return async function GET(req: NextRequest) {
-    const session = requireSession(req);
+    const session = await requireSession(req);
     if (!session) return unauthorized();
     if (!canRead(session.role)) return forbidden();
     const items = await listEquipmentClassificationByKind(kind, session);
@@ -27,7 +27,7 @@ export function createClassificationListRoute(kind: EquipmentClassificationKind)
 
 export function createClassificationCreateRoute(kind: EquipmentClassificationKind) {
   return async function POST(req: NextRequest) {
-    const session = requireSession(req);
+    const session = await requireSession(req);
     if (!session) return unauthorized();
     if (!canWrite(session.role)) return forbidden();
     const body = await readJsonBody(req);
@@ -45,7 +45,7 @@ export function createClassificationCreateRoute(kind: EquipmentClassificationKin
 
 export function createClassificationGetRoute(kind: EquipmentClassificationKind) {
   return async function GET(req: NextRequest, context: { params: Promise<{ id: string }> }) {
-    const session = requireSession(req);
+    const session = await requireSession(req);
     if (!session) return unauthorized();
     if (!canRead(session.role)) return forbidden();
     const { id } = await context.params;
@@ -57,7 +57,7 @@ export function createClassificationGetRoute(kind: EquipmentClassificationKind) 
 
 export function createClassificationUpdateRoute(kind: EquipmentClassificationKind) {
   return async function PUT(req: NextRequest, context: { params: Promise<{ id: string }> }) {
-    const session = requireSession(req);
+    const session = await requireSession(req);
     if (!session) return unauthorized();
     if (!canWrite(session.role)) return forbidden();
     const body = await readJsonBody(req);

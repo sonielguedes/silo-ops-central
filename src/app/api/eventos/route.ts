@@ -4,9 +4,9 @@ import {
   applyScopeToUrl,
   filterItemsBySessionScope,
   getScopeFilter,
-  getSessionFromRequest,
   normalizeScopeFields,
 } from "@/lib/auth";
+import { getSessionFromRequest } from "@/lib/auth-server";
 import { appendEquipmentTrailPoints, buildTrailPointFromRecord } from "@/lib/equipment-trail-store";
 
 const BASE = (process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "").trim().replace(/\/$/, "");
@@ -46,7 +46,7 @@ async function fetchUpstream(url: string) {
 }
 
 export async function GET(req: NextRequest) {
-  const session = getSessionFromRequest(req);
+  const session = await getSessionFromRequest(req);
   if (!session) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }

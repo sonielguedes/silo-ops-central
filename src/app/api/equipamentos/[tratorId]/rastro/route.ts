@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { IS_DEMO, SITE_URL } from "@/lib/app-env";
 import { normalizeEquipmentList } from "@/lib/api";
-import { filterItemsBySessionScope, getScopeFilter, getSessionFromRequest, isAdminGlobal } from "@/lib/auth";
+import {
+  filterItemsBySessionScope,
+  getScopeFilter,
+  isAdminGlobal,
+} from "@/lib/auth";
+import { getSessionFromRequest } from "@/lib/auth-server";
 import { appendEquipmentTrailPoints, buildTrailPointFromRecord, queryEquipmentTrailPoints } from "@/lib/equipment-trail-store";
 import { enrichTrailPointWithOperationalContext } from "@/lib/equipment-status-trail";
 
@@ -90,7 +95,7 @@ export async function GET(
   { params }: { params: Promise<{ tratorId: string }> },
 ) {
   try {
-    const session = getSessionFromRequest(req);
+    const session = await getSessionFromRequest(req);
     if (!session) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
